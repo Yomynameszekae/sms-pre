@@ -1,0 +1,2742 @@
+{
+  "info": {
+    "_postman_id": "f3a5a19a-7b3a-4c59-9a0e-000000000001",
+    "name": "brite-sms",
+    "description": "Comprehensive Postman collection for the Brite SMS NestJS API. Base URL defaults to http://localhost:3000/api/v1 via {{baseUrl}}. Protected endpoints inherit Bearer {{accessToken}} from the collection; run Auth / Login first to populate the token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({ key: \"Accept\", value: \"application/json\" });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Create/Action /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate with email or phone and password. Saves the returned access token to the active Postman environment.\n\nAuth: Public endpoint. No bearer token required.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let jsonData = {};",
+                  "try { jsonData = pm.response.json(); } catch (e) {}",
+                  "if (jsonData && jsonData.data && jsonData.data.accessToken) {",
+                  "  pm.environment.set(\"accessToken\", jsonData.data.accessToken);",
+                  "}",
+                  "pm.test(\"Login response is successful\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create/Action /auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rotate the HTTP-only refresh cookie and return a new access token. Requires Postman cookie jar to contain the refresh token set by login.\n\nAuth: Public endpoint. No bearer token required.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revoke the current authenticated session and clear the refresh cookie.\n\nAuth: Requires Bearer {{accessToken}}.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /auth/change-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change the current user password and revoke other sessions.\n\nAuth: Requires Bearer {{accessToken}}.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /auth/password-reset/request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password-reset/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "password-reset",
+                "request"
+              ]
+            },
+            "description": "Request a password reset token using an email or phone identifier.\n\nAuth: Public endpoint. No bearer token required.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /auth/password-reset/confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/password-reset/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "password-reset",
+                "confirm"
+              ]
+            },
+            "description": "Confirm password reset with a reset token and new password.\n\nAuth: Public endpoint. No bearer token required.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"paste-reset-token-here\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /auth/account-setup/confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/account-setup/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "account-setup",
+                "confirm"
+              ]
+            },
+            "description": "Complete account setup with a setup token and new password.\n\nAuth: Public endpoint. No bearer token required.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"paste-account-setup-token-here\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Return the current authenticated user profile.\n\nAuth: Requires Bearer {{accessToken}}.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create/Action /users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Create an application user linked to a staff or guardian entity.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new.user@example.com\",\n  \"phone\": \"233244000001\",\n  \"password\": \"{{password}}\",\n  \"linkedEntityType\": \"staff\",\n  \"linkedEntityId\": \"{{staffId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&isActive=true&linkedEntityType=staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": false
+                },
+                {
+                  "key": "linkedEntityType",
+                  "value": "staff",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List users with pagination and optional active/entity filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.read\nQuery parameters: page, limit, isActive, linkedEntityType.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /users/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Get a single user by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /users/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Update mutable user contact fields.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"updated.user@example.com\",\n  \"phone\": \"233244000002\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update /users/:id/deactivate",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "deactivate"
+              ]
+            },
+            "description": "Deactivate a user account.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.deactivate\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /users/:id/roles",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "roles"
+              ]
+            },
+            "description": "Assign a role to a user.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.manage_roles\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleId\": \"{{roleId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete /users/:id/roles/:roleId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/roles/{{roleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "roles",
+                "{{roleId}}"
+              ]
+            },
+            "description": "Remove a role from a user.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: users.manage_roles\nPath variables: id, roleId.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "Create/Action /roles",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "Create a role.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Operations Manager\",\n  \"code\": \"OPERATIONS_MANAGER\",\n  \"description\": \"Operational access for school administration\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "List roles.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /roles/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{roleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleId}}"
+              ]
+            },
+            "description": "Get a role by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /roles/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{roleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleId}}"
+              ]
+            },
+            "description": "Update a role.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Operations Manager\",\n  \"code\": \"OPERATIONS_MANAGER\",\n  \"description\": \"Updated role description\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /roles/:id/permissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{roleId}}/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleId}}",
+                "permissions"
+              ]
+            },
+            "description": "Assign a permission to a role.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.assign_permissions\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissionId\": \"{{permissionId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete /roles/:id/permissions/:permissionId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{roleId}}/permissions/{{permissionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleId}}",
+                "permissions",
+                "{{permissionId}}"
+              ]
+            },
+            "description": "Remove a permission from a role.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: roles.assign_permissions\nPath variables: id, permissionId.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Permissions",
+      "item": [
+        {
+          "name": "List /permissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions?module=users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissions"
+              ],
+              "query": [
+                {
+                  "key": "module",
+                  "value": "users",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List permissions, optionally filtered by module.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: permissions.read\nQuery parameters: module.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /permissions/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions/{{permissionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "{{permissionId}}"
+              ]
+            },
+            "description": "Get a permission by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: permissions.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "School",
+      "item": [
+        {
+          "name": "List /school",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/school",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school"
+              ]
+            },
+            "description": "Get the current school profile.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: school.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /school",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/school",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school"
+              ]
+            },
+            "description": "Update the current school profile.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: school.update\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Brite SMS Demo School\",\n  \"logoUrl\": \"https://example.com/logo.png\",\n  \"address\": \"Accra, Ghana\",\n  \"ghanaPostGps\": \"GA-000-0000\",\n  \"phone\": \"233200000000\",\n  \"email\": \"admin@example.com\",\n  \"motto\": \"Learning with clarity\",\n  \"registrationNumber\": \"REG-001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "School Settings",
+      "item": [
+        {
+          "name": "List /school-settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/school-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-settings"
+              ]
+            },
+            "description": "List school settings.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: school_settings.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "List /school-settings/:key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/school-settings/{{schoolSettingKey}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-settings",
+                "{{schoolSettingKey}}"
+              ]
+            },
+            "description": "Get a school setting by key.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: school_settings.read\nPath variables: key.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /school-settings/:key",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/school-settings/{{schoolSettingKey}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "school-settings",
+                "{{schoolSettingKey}}"
+              ]
+            },
+            "description": "Update a school setting JSON value.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: school_settings.update\nPath variables: key.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valueJson\": {\n    \"value\": \"BOTH\",\n    \"type\": \"string\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Document Sequences",
+      "item": [
+        {
+          "name": "List /document-sequences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/document-sequences",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "document-sequences"
+              ]
+            },
+            "description": "List document sequence counters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: document_sequences.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "List /document-sequences/:type",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/document-sequences/{{documentSequenceType}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "document-sequences",
+                "{{documentSequenceType}}"
+              ]
+            },
+            "description": "Get one document sequence by type.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: document_sequences.read\nPath variables: type.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /document-sequences/:type/generate",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/document-sequences/{{documentSequenceType}}/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "document-sequences",
+                "{{documentSequenceType}}",
+                "generate"
+              ]
+            },
+            "description": "Generate the next document number for a sequence type.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: document_sequences.generate\nPath variables: type.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /document-sequences/:type",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/document-sequences/{{documentSequenceType}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "document-sequences",
+                "{{documentSequenceType}}"
+              ]
+            },
+            "description": "Update sequence prefix, padding, or reset policy.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: document_sequences.update\nPath variables: type.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prefix\": \"STU\",\n  \"paddingLength\": 4,\n  \"resetPolicy\": \"yearly\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Academic Years",
+      "item": [
+        {
+          "name": "Create/Action /academic-years",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years"
+              ]
+            },
+            "description": "Create an academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"2026/2027\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-07-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /academic-years",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years"
+              ]
+            },
+            "description": "List academic years.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /academic-years/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": "Get an academic year by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /academic-years/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": "Update an academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"2026/2027 Updated\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-07-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /academic-years/:id/activate",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}",
+                "activate"
+              ]
+            },
+            "description": "Activate an academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.activate\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /academic-years/:id/close",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}",
+                "close"
+              ]
+            },
+            "description": "Close an academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: academic_years.close\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Terms",
+      "item": [
+        {
+          "name": "Create/Action /terms",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms"
+              ]
+            },
+            "description": "Create a term within an academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"termNumber\": 1,\n  \"label\": \"Term 1\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2026-12-15\",\n  \"examStartDate\": \"2026-12-01\",\n  \"examEndDate\": \"2026-12-10\",\n  \"curriculumScope\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /terms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/terms?academicYearId=%7B%7BacademicYearId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms"
+              ],
+              "query": [
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List terms, optionally by academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.read\nQuery parameters: academicYearId.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /terms/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}"
+              ]
+            },
+            "description": "Get a term by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /terms/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}"
+              ]
+            },
+            "description": "Update a term.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Term 1 Updated\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2026-12-15\",\n  \"curriculumScope\": \"BOTH\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /terms/:id/activate",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}",
+                "activate"
+              ]
+            },
+            "description": "Activate a term.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.activate\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /terms/:id/close",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}",
+                "close"
+              ]
+            },
+            "description": "Close a term.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: terms.close\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Levels",
+      "item": [
+        {
+          "name": "Create/Action /levels",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "levels"
+              ]
+            },
+            "description": "Create a school level.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: levels.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Basic 1\",\n  \"gesDesignation\": \"Basic 1\",\n  \"abekaDesignation\": \"Grade 1\",\n  \"orderIndex\": 1,\n  \"levelGroup\": \"LOWER_PRIMARY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /levels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "levels"
+              ]
+            },
+            "description": "List levels.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: levels.read\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /levels/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/levels/{{levelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "levels",
+                "{{levelId}}"
+              ]
+            },
+            "description": "Get a level by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: levels.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /levels/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/levels/{{levelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "levels",
+                "{{levelId}}"
+              ]
+            },
+            "description": "Update a level.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: levels.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Basic 1 Updated\",\n  \"gesDesignation\": \"Basic 1\",\n  \"abekaDesignation\": \"Grade 1\",\n  \"orderIndex\": 1,\n  \"levelGroup\": \"LOWER_PRIMARY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /levels/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/levels/{{levelId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "levels",
+                "{{levelId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive a level.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: levels.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Classrooms",
+      "item": [
+        {
+          "name": "Create/Action /classrooms",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms"
+              ]
+            },
+            "description": "Create a classroom for a level and academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"levelId\": \"{{levelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"sectionLabel\": \"A\",\n  \"displayName\": \"Basic 1A\",\n  \"capacity\": 35\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /classrooms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms?levelId=%7B%7BlevelId%7D%7D&academicYearId=%7B%7BacademicYearId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms"
+              ],
+              "query": [
+                {
+                  "key": "levelId",
+                  "value": "{{levelId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List classrooms, optionally filtered by level or academic year.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.read\nQuery parameters: levelId, academicYearId.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /classrooms/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms/{{classroomId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms",
+                "{{classroomId}}"
+              ]
+            },
+            "description": "Get a classroom by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /classrooms/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms/{{classroomId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms",
+                "{{classroomId}}"
+              ]
+            },
+            "description": "Update classroom details.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"levelId\": \"{{levelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"sectionLabel\": \"A\",\n  \"displayName\": \"Basic 1A Updated\",\n  \"capacity\": 40\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /classrooms/:id/assign-class-teacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms/{{classroomId}}/assign-class-teacher",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms",
+                "{{classroomId}}",
+                "assign-class-teacher"
+              ]
+            },
+            "description": "Assign a staff member as classroom teacher.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.assign_teacher\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffId\": \"{{staffId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /classrooms/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/classrooms/{{classroomId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classrooms",
+                "{{classroomId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive a classroom.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: classrooms.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "item": [
+        {
+          "name": "Create/Action /staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": "Create a staff record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: staff.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staffNumber\": \"STF-2026-0002\",\n  \"firstName\": \"Akosua\",\n  \"lastName\": \"Mensah\",\n  \"phone\": \"233244000003\",\n  \"email\": \"akosua.mensah@example.com\",\n  \"roleCategory\": \"teacher\",\n  \"employmentType\": \"full_time\",\n  \"ntcRegistrationNumber\": \"NTC-12345\",\n  \"ntcStatus\": \"licensed\",\n  \"joinedAt\": \"2026-01-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&status=active&roleCategory=teacher",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": false
+                },
+                {
+                  "key": "roleCategory",
+                  "value": "teacher",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List staff with pagination and filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: staff.read\nQuery parameters: page, limit, status, roleCategory.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /staff/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffId}}"
+              ]
+            },
+            "description": "Get a staff record by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: staff.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /staff/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffId}}"
+              ]
+            },
+            "description": "Update a staff record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: staff.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Akosua\",\n  \"lastName\": \"Mensah-Boateng\",\n  \"phone\": \"233244000004\",\n  \"email\": \"akosua.updated@example.com\",\n  \"roleCategory\": \"teacher\",\n  \"employmentType\": \"full_time\",\n  \"ntcStatus\": \"licensed\",\n  \"joinedAt\": \"2026-01-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /staff/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{staffId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "{{staffId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive a staff record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: staff.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "Create/Action /students",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "Create a student record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentNumber\": \"STU-2026-0001\",\n  \"firstName\": \"Ama\",\n  \"middleName\": \"Efua\",\n  \"lastName\": \"Owusu\",\n  \"preferredName\": \"Ama\",\n  \"dateOfBirth\": \"2018-04-20\",\n  \"gender\": \"female\",\n  \"nationality\": \"Ghanaian\",\n  \"religion\": \"Christian\",\n  \"ghanaCardId\": \"GHA-000000000-0\",\n  \"previousSchool\": \"Little Stars Academy\",\n  \"admissionDate\": \"2026-09-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&status=active&search=%7B%7Bsearch%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List students with pagination and filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.read\nQuery parameters: page, limit, status, search.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /students/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students/{{studentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "{{studentId}}"
+              ]
+            },
+            "description": "Get a student record by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /students/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students/{{studentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "{{studentId}}"
+              ]
+            },
+            "description": "Update a student record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ama\",\n  \"middleName\": \"Efua\",\n  \"lastName\": \"Owusu\",\n  \"preferredName\": \"Ama\",\n  \"dateOfBirth\": \"2018-04-20\",\n  \"gender\": \"female\",\n  \"nationality\": \"Ghanaian\",\n  \"religion\": \"Christian\",\n  \"ghanaCardId\": \"GHA-000000000-0\",\n  \"previousSchool\": \"Little Stars Academy\",\n  \"admissionDate\": \"2026-09-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /students/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students/{{studentId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "{{studentId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive a student record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /students/:id/guardians",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students/{{studentId}}/guardians",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "{{studentId}}",
+                "guardians"
+              ]
+            },
+            "description": "List guardians linked to a student.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /students/:id/enrollments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students/{{studentId}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students",
+                "{{studentId}}",
+                "enrollments"
+              ]
+            },
+            "description": "List enrollments linked to a student.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: students.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Guardians",
+      "item": [
+        {
+          "name": "Create/Action /guardians",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/guardians",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians"
+              ]
+            },
+            "description": "Create a guardian record.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kwame\",\n  \"lastName\": \"Owusu\",\n  \"phonePrimary\": \"233244000005\",\n  \"phoneSecondary\": \"233244000006\",\n  \"email\": \"kwame.owusu@example.com\",\n  \"occupation\": \"Engineer\",\n  \"address\": \"Accra, Ghana\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /guardians",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guardians?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&search=%7B%7Bsearch%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List guardians with pagination and search.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.read\nQuery parameters: page, limit, search.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /guardians/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guardians/{{guardianId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians",
+                "{{guardianId}}"
+              ]
+            },
+            "description": "Get a guardian by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /guardians/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/guardians/{{guardianId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians",
+                "{{guardianId}}"
+              ]
+            },
+            "description": "Update a guardian.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Kwame\",\n  \"lastName\": \"Owusu\",\n  \"phonePrimary\": \"233244000007\",\n  \"email\": \"kwame.updated@example.com\",\n  \"occupation\": \"Engineer\",\n  \"address\": \"Accra, Ghana\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /guardians/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guardians/{{guardianId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians",
+                "{{guardianId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive a guardian.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /guardians/:id/students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guardians/{{guardianId}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "guardians",
+                "{{guardianId}}",
+                "students"
+              ]
+            },
+            "description": "List students linked to a guardian.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: guardians.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Student Guardians",
+      "item": [
+        {
+          "name": "Create/Action /student-guardians",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/student-guardians",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "student-guardians"
+              ]
+            },
+            "description": "Link a student and guardian.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: student_guardians.manage\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"guardianId\": \"{{guardianId}}\",\n  \"relationship\": \"Father\",\n  \"isPrimary\": true,\n  \"isEmergencyContact\": true,\n  \"canReceiveSms\": true,\n  \"canAccessPortal\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update /student-guardians/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/student-guardians/{{studentGuardianId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "student-guardians",
+                "{{studentGuardianId}}"
+              ]
+            },
+            "description": "Update a student-guardian relationship.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: student_guardians.manage\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relationship\": \"Father\",\n  \"isPrimary\": true,\n  \"isEmergencyContact\": true,\n  \"canReceiveSms\": true,\n  \"canAccessPortal\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete /student-guardians/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/student-guardians/{{studentGuardianId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "student-guardians",
+                "{{studentGuardianId}}"
+              ]
+            },
+            "description": "Remove a student-guardian relationship.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: student_guardians.manage\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /student-guardians/:id/set-primary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/student-guardians/{{studentGuardianId}}/set-primary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "student-guardians",
+                "{{studentGuardianId}}",
+                "set-primary"
+              ]
+            },
+            "description": "Set a student-guardian relationship as primary.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: student_guardians.manage\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admissions",
+      "item": [
+        {
+          "name": "Create/Action /admissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions"
+              ]
+            },
+            "description": "Create an admission application.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"intendedLevelId\": \"{{levelId}}\",\n  \"curriculumInterest\": \"BOTH\",\n  \"enquirySource\": \"walk_in\",\n  \"notes\": \"Parent visited the school office.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /admissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admissions?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&status=application",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "application",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List admission applications with pagination and filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.read\nQuery parameters: page, limit, status.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /admissions/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admissions/{{admissionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions",
+                "{{admissionId}}"
+              ]
+            },
+            "description": "Get an admission application by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /admissions/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admissions/{{admissionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions",
+                "{{admissionId}}"
+              ]
+            },
+            "description": "Update an admission application.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"intendedLevelId\": \"{{levelId}}\",\n  \"curriculumInterest\": \"BOTH\",\n  \"enquirySource\": \"walk_in\",\n  \"notes\": \"Updated admission notes.\",\n  \"admissionNumber\": \"ADM-2026-0001\",\n  \"status\": \"application\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /admissions/:id/offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admissions/{{admissionId}}/offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions",
+                "{{admissionId}}",
+                "offer"
+              ]
+            },
+            "description": "Offer admission for an application.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.approve\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Offer approved after document review.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /admissions/:id/enroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admissions/{{admissionId}}/enroll",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admissions",
+                "{{admissionId}}",
+                "enroll"
+              ]
+            },
+            "description": "Enroll an offered admission into a classroom.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: admissions.enroll\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classroomId\": \"{{classroomId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"curriculumTrack\": \"GES_NACCA\",\n  \"studentId\": \"{{studentId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Enrollments",
+      "item": [
+        {
+          "name": "Create/Action /enrollments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ]
+            },
+            "description": "Create an enrollment.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: enrollments.create\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"classroomId\": \"{{classroomId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"curriculumTrack\": \"GES_NACCA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /enrollments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&studentId=%7B%7BstudentId%7D%7D&classroomId=%7B%7BclassroomId%7D%7D&academicYearId=%7B%7BacademicYearId%7D%7D&status=active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "studentId",
+                  "value": "{{studentId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "classroomId",
+                  "value": "{{classroomId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List enrollments with pagination and filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: enrollments.read\nQuery parameters: page, limit, studentId, classroomId, academicYearId, status.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /enrollments/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/{{enrollmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "{{enrollmentId}}"
+              ]
+            },
+            "description": "Get an enrollment by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: enrollments.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Update /enrollments/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/{{enrollmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "{{enrollmentId}}"
+              ]
+            },
+            "description": "Update enrollment status.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: enrollments.update\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /enrollments/:id/withdraw",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/{{enrollmentId}}/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "{{enrollmentId}}",
+                "withdraw"
+              ]
+            },
+            "description": "Withdraw an enrollment with exit details.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: enrollments.withdraw\nPath variables: id.\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exitDate\": \"2026-12-15\",\n  \"exitReason\": \"Transferred to another school\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        {
+          "name": "Create/Action /files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files"
+              ]
+            },
+            "description": "Create file metadata. This is metadata-only and does not upload binary content.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: files.upload\nRequest body: JSON matching the included example body.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ownerType\": \"student\",\n  \"ownerId\": \"{{studentId}}\",\n  \"category\": \"admission_document\",\n  \"originalFileName\": \"birth-certificate.pdf\",\n  \"storedFileName\": \"birth-certificate-2026.pdf\",\n  \"mimeType\": \"application/pdf\",\n  \"sizeBytes\": 245760,\n  \"storageBucket\": \"ghana-sms-dev\",\n  \"storageKey\": \"students/{{studentId}}/birth-certificate.pdf\",\n  \"checksumSha256\": \"abc123def456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List /files",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&ownerType=%7B%7BownerType%7D%7D&ownerId=%7B%7BownerId%7D%7D&category=admission_document",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "ownerType",
+                  "value": "{{ownerType}}",
+                  "disabled": false
+                },
+                {
+                  "key": "ownerId",
+                  "value": "{{ownerId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "category",
+                  "value": "admission_document",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List file metadata with pagination and filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: files.read\nQuery parameters: page, limit, ownerType, ownerId, category.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "List /files/owner/:ownerType/:ownerId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/owner/{{ownerType}}/{{ownerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "owner",
+                "{{ownerType}}",
+                "{{ownerId}}"
+              ]
+            },
+            "description": "List file metadata by owner type and owner id.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: files.read\nPath variables: ownerType, ownerId.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /files/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}"
+              ]
+            },
+            "description": "Get file metadata by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: files.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Create/Action /files/:id/archive",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}/archive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}",
+                "archive"
+              ]
+            },
+            "description": "Archive file metadata.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: files.archive\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Audit Logs",
+      "item": [
+        {
+          "name": "List /audit-logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit-logs?page=%7B%7Bpage%7D%7D&limit=%7B%7Blimit%7D%7D&action=auth.login&module=auth&entityType=user_session&entityId=%7B%7BuserId%7D%7D&requestId=%7B%7BrequestId%7D%7D&from=%7B%7Bfrom%7D%7D&to=%7B%7Bto%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "action",
+                  "value": "auth.login",
+                  "disabled": false
+                },
+                {
+                  "key": "module",
+                  "value": "auth",
+                  "disabled": false
+                },
+                {
+                  "key": "entityType",
+                  "value": "user_session",
+                  "disabled": false
+                },
+                {
+                  "key": "entityId",
+                  "value": "{{userId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "requestId",
+                  "value": "{{requestId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "from",
+                  "value": "{{from}}",
+                  "disabled": false
+                },
+                {
+                  "key": "to",
+                  "value": "{{to}}",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "List audit logs with pagination and audit filters.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: audit_logs.read\nQuery parameters: page, limit, action, module, entityType, entityId, requestId, from, to.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        },
+        {
+          "name": "Get /audit-logs/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/audit-logs/{{auditLogId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit-logs",
+                "{{auditLogId}}"
+              ]
+            },
+            "description": "Get an audit log entry by UUID.\n\nAuth: Requires Bearer {{accessToken}}.\nPermission: audit_logs.read\nPath variables: id.\nRequest body: none.\n\nSuccessful responses use { success: true, message, data }. Paginated list responses use data.items and data.pagination. Error responses use { success: false, statusCode, message, path, timestamp } and may include errors for validation failures."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
