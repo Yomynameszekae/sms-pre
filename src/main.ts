@@ -7,6 +7,15 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
+function parseCorsOrigins(origin: string): string | string[] {
+  const origins = origin
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return origins.length <= 1 ? origins[0] || origin : origins;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -33,7 +42,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.enableCors({
-    origin: corsOrigin,
+    origin: parseCorsOrigins(corsOrigin),
     credentials: true,
   });
 

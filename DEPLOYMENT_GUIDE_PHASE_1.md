@@ -829,7 +829,7 @@ Then re-run `npm run db:raw-sql`. The script will skip the already-installed ext
 Access to XMLHttpRequest blocked by CORS policy: No 'Access-Control-Allow-Origin' header
 ```
 
-**Fix:** The `CORS_ORIGIN` environment variable does not match the origin of the request. Set it to the exact origin (scheme + host + port) of the client. Desktop Postman does not enforce CORS — this error only appears in browser-based clients.
+**Fix:** The `CORS_ORIGIN` environment variable does not match the origin of the request. Set it to the exact origin (scheme + host + port) of the client. If more than one frontend origin must call the API, use a comma-separated list, for example `CORS_ORIGIN=https://app.example.com,http://46.225.60.249:3002`. Desktop Postman does not enforce CORS — this error only appears in browser-based clients.
 
 ---
 
