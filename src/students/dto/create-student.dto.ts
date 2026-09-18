@@ -7,8 +7,11 @@ import {
 import { Gender } from '@prisma/client';
 
 export class CreateStudentDto {
+  // Optional: left blank, the service auto-generates the next number from the
+  // school's student_number document sequence.
+  @IsOptional()
   @IsString()
-  studentNumber: string;
+  studentNumber?: string;
 
   @IsString()
   firstName: string;

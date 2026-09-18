@@ -16,8 +16,18 @@ function parseCorsOrigins(origin: string): string | string[] {
   return origins.length <= 1 ? origins[0] || origin : origins;
 }
 
+// Captured once at process start. Every response carries it as x-booted-at so
+// tooling (QA preflight) can detect an orphaned process serving stale code:
+// if the newest source file is younger than this timestamp, the running
+// server cannot contain it.
+const BOOTED_AT = new Date().toISOString();
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
+    res.setHeader('x-booted-at', BOOTED_AT);
+    next();
+  });
 
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT', 3000);
@@ -35,7 +45,15 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
+      // Implicit conversion is OFF deliberately: with it on, every
+      // @IsString() body field silently accepted JSON numbers (dropping
+      // leading zeros from Ghanaian phone numbers) and @IsInt fields
+      // accepted numeric strings. The two places that genuinely need
+      // string→value conversion from query params carry explicit
+      // decorators instead: PaginationDto (@Type(() => Number) on
+      // page/limit) and QueryUsersDto.isActive (@Transform). New numeric
+      // or boolean QUERY-param fields must do the same.
+      transformOptions: { enableImplicitConversion: false },
     }),
   );
 

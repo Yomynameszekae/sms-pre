@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateLevelDto } from './dto/create-level.dto';
@@ -44,11 +45,35 @@ export class LevelsService {
     return level;
   }
 
-  async findAll(schoolId: string) {
+  async findAll(schoolId: string, includeArchived = false) {
     return this.prisma.level.findMany({
-      where: { schoolId, isActive: true },
+      where: { schoolId, ...(includeArchived ? {} : { isActive: true }) },
       orderBy: { orderIndex: 'asc' },
     });
+  }
+
+  /** Inverse of archive: isActive back to true. Fixed restore state. */
+  async restore(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (existing.isActive) {
+      throw new ConflictException('Level is not archived');
+    }
+
+    const level = await this.prisma.level.update({
+      where: { id },
+      data: { isActive: true, updatedBy: userId },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'levels.restored',
+      module: 'levels',
+      entityType: 'level',
+      entityId: id,
+      changes: { before: { isActive: false }, after: { isActive: true } },
+    });
+
+    return level;
   }
 
   async findOne(id: string, schoolId: string) {

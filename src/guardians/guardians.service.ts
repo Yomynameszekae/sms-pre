@@ -63,7 +63,7 @@ export class GuardiansService {
   async findAll(schoolId: string, query: QueryGuardiansDto) {
     const { skip, take } = getPaginationParams(query.page, query.limit);
 
-    const where: any = { schoolId, archivedAt: null };
+    const where: any = { schoolId, ...(query.includeArchived ? {} : { archivedAt: null }) };
     if (query.search) {
       where.OR = [
         { firstName: { contains: query.search, mode: 'insensitive' } },
@@ -164,6 +164,33 @@ export class GuardiansService {
       module: 'guardians',
       entityType: 'guardian',
       entityId: guardian.id,
+    });
+
+    return guardian;
+  }
+
+  /**
+   * Inverse of archive. Links (including isPrimary) were never touched by
+   * archive, so restore is lossless by construction.
+   */
+  async restore(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (!existing.archivedAt) {
+      throw new ConflictException('Guardian is not archived');
+    }
+
+    const guardian = await this.prisma.guardian.update({
+      where: { id },
+      data: { archivedAt: null, updatedBy: userId },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'guardians.restored',
+      module: 'guardians',
+      entityType: 'guardian',
+      entityId: id,
+      changes: { before: { archivedAt: existing.archivedAt }, after: { archivedAt: null } },
     });
 
     return guardian;

@@ -12,8 +12,11 @@ import {
 } from '@prisma/client';
 
 export class CreateStaffDto {
+  // Optional: left blank, the service auto-generates the next number from the
+  // school's staff_number document sequence.
+  @IsOptional()
   @IsString()
-  staffNumber: string;
+  staffNumber?: string;
 
   @IsString()
   firstName: string;

@@ -14,7 +14,11 @@ const mockPrisma = {
   },
   studentGuardian: { findMany: jest.fn() },
   enrollment: { findMany: jest.fn() },
-  $transaction: jest.fn((ops) => Promise.all(ops)),
+  // Supports both $transaction forms: the array form and the interactive
+  // callback form (the callback receives this same mock as the tx client).
+  $transaction: jest.fn((arg) =>
+    typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)),
+  documentSequence: { update: jest.fn() },
 };
 
 const mockAuditLogs = { create: jest.fn() };
@@ -62,12 +66,31 @@ describe('StudentsService', () => {
     it('always filters list by schoolId', async () => {
       mockPrisma.student.findMany.mockResolvedValue([]);
       mockPrisma.student.count.mockResolvedValue(0);
-      mockPrisma.$transaction.mockImplementation(async (ops) => Promise.all(ops));
+      mockPrisma.$transaction.mockImplementation(async (arg: any) =>
+        typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg));
 
       await service.findAll('school-a', { page: 1, limit: 20 });
 
       const call = mockPrisma.student.findMany.mock.calls[0][0];
       expect(call.where).toEqual(expect.objectContaining({ schoolId: 'school-a' }));
+    });
+
+    it('search matches student number as well as first and last name', async () => {
+      mockPrisma.student.findMany.mockResolvedValue([]);
+      mockPrisma.student.count.mockResolvedValue(0);
+      mockPrisma.$transaction.mockImplementation(async (arg: any) =>
+        typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg));
+
+      await service.findAll('school-a', { page: 1, limit: 20, search: 'STU-00' });
+
+      const call = mockPrisma.student.findMany.mock.calls[0][0];
+      expect(call.where.OR).toEqual(
+        expect.arrayContaining([
+          { studentNumber: { contains: 'STU-00', mode: 'insensitive' } },
+          { firstName: { contains: 'STU-00', mode: 'insensitive' } },
+          { lastName: { contains: 'STU-00', mode: 'insensitive' } },
+        ]),
+      );
     });
   });
 

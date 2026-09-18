@@ -13,7 +13,10 @@ const mockPrisma = {
     update: jest.fn(),
     count: jest.fn(),
   },
-  $transaction: jest.fn(),
+  // Dual-form $transaction: interactive callbacks receive this mock as tx.
+  $transaction: jest.fn((arg) =>
+    typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg)),
+  documentSequence: { update: jest.fn() },
 };
 
 const mockAuditLogs = { create: jest.fn() };

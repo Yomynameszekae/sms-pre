@@ -100,6 +100,7 @@ enum AdmissionStatus {
   offered
   rejected
   enrolled
+  withdrawn
 
   @@map("admission_status")
 }
@@ -383,14 +384,14 @@ model User {
   createdBy String?  @map("created_by") @db.Uuid
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  school        School        @relation(fields: [schoolId], references: [id])
+  school        School                @relation(fields: [schoolId], references: [id])
   // Named "UserRoles" to distinguish from the grantedRoles relation (Prisma requires all multi-relations be named)
-  roles         UserRole[]    @relation("UserRoles")
+  roles         UserRole[]            @relation("UserRoles")
   sessions      UserSession[]
   tokens        AuthToken[]
-  grantedRoles  UserRole[]    @relation("GrantedUserRoles")
+  grantedRoles  UserRole[]            @relation("GrantedUserRoles")
   auditLogs     AuditLog[]
-  uploadedFiles File[]        @relation("UploadedFiles")
+  uploadedFiles File[]                @relation("UploadedFiles")
 
   @@index([schoolId])
   @@index([email])
@@ -628,10 +629,10 @@ model Student {
   createdBy String?  @map("created_by") @db.Uuid
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  school      School                 @relation(fields: [schoolId], references: [id])
-  guardians   StudentGuardian[]
-  admissions  AdmissionApplication[]
-  enrollments Enrollment[]
+  school        School                 @relation(fields: [schoolId], references: [id])
+  guardians     StudentGuardian[]
+  admissions    AdmissionApplication[]
+  enrollments   Enrollment[]
 
   @@unique([schoolId, studentNumber])
   @@index([schoolId])
@@ -662,8 +663,8 @@ model Guardian {
   createdBy String?  @map("created_by") @db.Uuid
   updatedBy String?  @map("updated_by") @db.Uuid
 
-  school   School            @relation(fields: [schoolId], references: [id])
-  students StudentGuardian[]
+  school        School                @relation(fields: [schoolId], references: [id])
+  students      StudentGuardian[]
 
   @@unique([schoolId, phonePrimary])
   @@index([schoolId])
@@ -735,6 +736,7 @@ model AdmissionApplication {
   intendedLevel Level?   @relation(fields: [intendedLevelId], references: [id])
   approver      Staff?   @relation("AdmissionApprovedBy", fields: [approvedBy], references: [id])
 
+  @@unique([schoolId, admissionNumber])
   @@index([schoolId])
   @@index([schoolId, status])
   @@index([studentId])
@@ -768,6 +770,22 @@ model Enrollment {
   classroom    Classroom    @relation(fields: [classroomId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
 
+  // NOTE — two unique constraints govern this table, and only one of them can
+  // be expressed here.
+  //
+  //   1. @@unique below → enrollments_student_id_academic_year_id_curriculum_track_key
+  //      Stops the exact same (student, year, track) row being created twice,
+  //      including after a withdrawal. Managed by Prisma; keep it.
+  //
+  //   2. uq_one_active_enrollment_per_student_year
+  //        UNIQUE (student_id, academic_year_id) WHERE status = 'active'
+  //      A PARTIAL unique index — Prisma has no syntax for it, so it lives in
+  //      starter-docs/phase_1_required_raw_sql_migrations.sql and is applied by
+  //      `npm run db:raw-sql`. THIS is the constraint that fires in practice:
+  //      a student may hold only ONE ACTIVE enrollment per academic year,
+  //      whatever the curriculum track. It is invisible to `prisma migrate`,
+  //      so never assume the schema below is the whole story, and re-run the
+  //      raw SQL after any migrate that recreates this table.
   @@unique([studentId, academicYearId, curriculumTrack])
   @@index([schoolId])
   @@index([schoolId, status])
@@ -863,3 +881,4 @@ model AuditLog {
   @@index([schoolId, entityType, entityId])
   @@map("audit_logs")
 }
+

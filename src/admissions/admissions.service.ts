@@ -10,9 +10,14 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { UpdateAdmissionDto } from './dto/update-admission.dto';
 import { OfferAdmissionDto } from './dto/offer-admission.dto';
+import { TransitionNotesDto } from './dto/transition-admission.dto';
 import { EnrollAdmissionDto } from './dto/enroll-admission.dto';
 import { QueryAdmissionsDto } from './dto/query-admissions.dto';
 import { getPaginationParams, paginate } from '../common/utils/pagination.util';
+import {
+  nextDocumentNumber,
+  isUniqueViolationOn,
+} from '../common/utils/document-number.util';
 
 @Injectable()
 export class AdmissionsService {
@@ -27,18 +32,48 @@ export class AdmissionsService {
     schoolId: string,
     requestId?: string,
   ) {
-    const admission = await this.prisma.admissionApplication.create({
-      data: {
-        schoolId,
-        studentId: dto.studentId ?? null,
-        intendedLevelId: dto.intendedLevelId ?? null,
-        curriculumInterest: dto.curriculumInterest,
-        enquirySource: dto.enquirySource ?? null,
-        notes: dto.notes ?? null,
-        createdBy: userId,
-        updatedBy: userId,
-      },
-    });
+    // The admission number is claimed from the document sequence inside the
+    // same transaction as the insert, so number consumption and record
+    // creation commit together. A manually edited number can occupy a value
+    // the sequence has not reached yet; on that P2002 we claim the next value
+    // and retry, bounded.
+    const MAX_ATTEMPTS = 3;
+    let admission!: Awaited<
+      ReturnType<typeof this.prisma.admissionApplication.create>
+    >;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        admission = await this.prisma.$transaction(async (tx) => {
+          const admissionNumber = await nextDocumentNumber(
+            tx,
+            schoolId,
+            'admission_number',
+          );
+          return tx.admissionApplication.create({
+            data: {
+              schoolId,
+              admissionNumber,
+              studentId: dto.studentId ?? null,
+              intendedLevelId: dto.intendedLevelId ?? null,
+              curriculumInterest: dto.curriculumInterest,
+              enquirySource: dto.enquirySource ?? null,
+              notes: dto.notes ?? null,
+              createdBy: userId,
+              updatedBy: userId,
+            },
+          });
+        });
+        break;
+      } catch (err) {
+        if (
+          attempt < MAX_ATTEMPTS &&
+          isUniqueViolationOn(err, /admission_number|admission_school_number/)
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
 
     await this.auditLogs.create({
       schoolId,
@@ -48,7 +83,7 @@ export class AdmissionsService {
       module: 'admissions',
       entityType: 'admission_application',
       entityId: admission.id,
-      changes: { after: dto },
+      changes: { after: { ...dto, admissionNumber: admission.admissionNumber } },
     });
 
     return admission;
@@ -94,7 +129,9 @@ export class AdmissionsService {
   ) {
     const existing = await this.findOne(id, schoolId);
 
-    const updated = await this.prisma.admissionApplication.update({
+    let updated;
+    try {
+      updated = await this.prisma.admissionApplication.update({
       where: { id },
       data: {
         ...(dto.admissionNumber !== undefined && { admissionNumber: dto.admissionNumber }),
@@ -103,10 +140,17 @@ export class AdmissionsService {
         ...(dto.curriculumInterest !== undefined && { curriculumInterest: dto.curriculumInterest }),
         ...(dto.enquirySource !== undefined && { enquirySource: dto.enquirySource }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
-        ...(dto.status !== undefined && { status: dto.status }),
         updatedBy: userId,
       },
-    });
+      });
+    } catch (err) {
+      if (isUniqueViolationOn(err, /admission_number|admission_school_number/)) {
+        throw new ConflictException(
+          `Admission number ${dto.admissionNumber} is already in use`,
+        );
+      }
+      throw err;
+    }
 
     await this.auditLogs.create({
       schoolId,
@@ -144,16 +188,29 @@ export class AdmissionsService {
       existing.status !== 'enquiry' &&
       existing.status !== 'application'
     ) {
-      throw new BadRequestException(
+      throw new ConflictException(
         'Offer can only be made for applications in enquiry or application status',
       );
     }
 
+    // approvedBy is a foreign key to STAFF, not users — resolve the acting
+    // user's linked staff record. Users linked to a guardian (or nothing)
+    // approve with a null staff link; the audit entry still records userId.
+    const actor = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { linkedEntityType: true, linkedEntityId: true },
+    });
+    const approvedBy =
+      actor?.linkedEntityType === 'staff' ? actor.linkedEntityId : null;
+
+    const now = new Date();
     const updated = await this.prisma.admissionApplication.update({
       where: { id },
       data: {
         status: 'offered',
-        offeredAt: new Date(),
+        offeredAt: now,
+        approvedBy,
+        approvedAt: now,
         ...(dto.notes !== undefined && { notes: dto.notes }),
         updatedBy: userId,
       },
@@ -169,7 +226,198 @@ export class AdmissionsService {
       entityId: id,
       changes: {
         before: { status: existing.status },
-        after: { status: 'offered', offeredAt: updated.offeredAt },
+        after: { status: 'offered', offeredAt: updated.offeredAt, approvedBy },
+      },
+    });
+
+    return updated;
+  }
+
+  /** enquiry → application: the paperwork stage is formally opened. */
+  async apply(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (existing.status !== 'enquiry') {
+      throw new ConflictException(
+        `Only an enquiry can move to application (this admission is ${existing.status})`,
+      );
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: { status: 'application', updatedBy: userId },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'admissions.application_submitted',
+      module: 'admissions',
+      entityType: 'admission_application',
+      entityId: id,
+      changes: { before: { status: existing.status }, after: { status: 'application' } },
+    });
+
+    return updated;
+  }
+
+  /**
+   * offered → application. Clears exactly what offer() set. The student link
+   * is retained on every reversal — it is a factual association, not stage
+   * state.
+   */
+  async revertOffer(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (existing.status !== 'offered') {
+      throw new ConflictException(
+        `Only an offered admission can have its offer reverted (this admission is ${existing.status})`,
+      );
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: {
+        status: 'application',
+        offeredAt: null,
+        approvedBy: null,
+        approvedAt: null,
+        updatedBy: userId,
+      },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'admissions.offer_reverted',
+      module: 'admissions',
+      entityType: 'admission_application',
+      entityId: id,
+      changes: {
+        before: { status: 'offered', offeredAt: existing.offeredAt, approvedBy: existing.approvedBy },
+        after: { status: 'application', offeredAt: null, approvedBy: null },
+      },
+    });
+
+    return updated;
+  }
+
+  /** enquiry | application | offered → rejected (terminal). School declines. */
+  async reject(
+    id: string,
+    dto: TransitionNotesDto,
+    userId: string,
+    schoolId: string,
+    requestId?: string,
+  ) {
+    return this.terminalTransition(id, 'rejected', 'admissions.rejected', dto, userId, schoolId, requestId);
+  }
+
+  /** enquiry | application | offered → withdrawn (terminal). Family declines. */
+  async withdraw(
+    id: string,
+    dto: TransitionNotesDto,
+    userId: string,
+    schoolId: string,
+    requestId?: string,
+  ) {
+    return this.terminalTransition(id, 'withdrawn', 'admissions.withdrawn', dto, userId, schoolId, requestId);
+  }
+
+  private async terminalTransition(
+    id: string,
+    target: 'rejected' | 'withdrawn',
+    action: string,
+    dto: TransitionNotesDto,
+    userId: string,
+    schoolId: string,
+    requestId?: string,
+  ) {
+    const existing = await this.findOne(id, schoolId);
+    const allowed = ['enquiry', 'application', 'offered'];
+    if (!allowed.includes(existing.status)) {
+      throw new ConflictException(
+        `An admission can only be ${target} while in enquiry, application, or offered status (this admission is ${existing.status})`,
+      );
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: {
+        status: target,
+        ...(dto.notes !== undefined && { notes: dto.notes }),
+        updatedBy: userId,
+      },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action,
+      module: 'admissions',
+      entityType: 'admission_application',
+      entityId: id,
+      changes: { before: { status: existing.status }, after: { status: target } },
+    });
+
+    return updated;
+  }
+
+  /**
+   * enrolled → offered — mistake correction only.
+   *
+   * Guard: the admission's student must have NO enrollment in any state other
+   * than 'withdrawn'. An active enrollment must be withdrawn first (through
+   * the enrollments module, with its own exit date, reason, and audit trail).
+   * A completed, graduated, or transferred enrollment records a REAL outcome —
+   * the offer was genuinely taken up and run to term — and reverting the
+   * admission would falsify that history, so it is refused outright.
+   *
+   * The guard is student-wide because the admission record does not store
+   * which enrollment its enroll() call created (and the approved design adds
+   * no columns). Conservative over-blocking of stale-admission reverts after
+   * a student re-enrolls elsewhere is accepted.
+   */
+  async revertEnrollment(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (existing.status !== 'enrolled') {
+      throw new ConflictException(
+        `Only an enrolled admission can have its enrollment reverted (this admission is ${existing.status})`,
+      );
+    }
+
+    if (existing.studentId) {
+      const blocking = await this.prisma.enrollment.findFirst({
+        where: {
+          schoolId,
+          studentId: existing.studentId,
+          status: { not: 'withdrawn' },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (blocking?.status === 'active') {
+        throw new ConflictException('Withdraw the enrollment first.');
+      }
+      if (blocking) {
+        throw new ConflictException(
+          `Cannot revert: the student's enrollment is ${blocking.status}, which records a real outcome. Reversal is only available after an enrollment is withdrawn.`,
+        );
+      }
+    }
+
+    const updated = await this.prisma.admissionApplication.update({
+      where: { id },
+      data: {
+        status: 'offered',
+        enrolledAt: null,
+        updatedBy: userId,
+      },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'admissions.enrollment_reverted',
+      module: 'admissions',
+      entityType: 'admission_application',
+      entityId: id,
+      changes: {
+        before: { status: 'enrolled', enrolledAt: existing.enrolledAt, studentId: existing.studentId },
+        after: { status: 'offered', enrolledAt: null, studentId: existing.studentId },
       },
     });
 
@@ -217,6 +465,32 @@ export class AdmissionsService {
       );
     }
 
+    // Enrollments may be created for the active year, a not-yet-activated
+    // current year, or a future year (pre-enrollment is the admissions
+    // season). Only a year that has already ENDED is refused.
+    if (academicYear.endDate < new Date()) {
+      throw new ConflictException(
+        `Cannot enroll into ${academicYear.label}: the academic year ended on ` +
+          `${academicYear.endDate.toISOString().slice(0, 10)}.`,
+      );
+    }
+
+    // The classroom must belong to the selected academic year. The
+    // one-active-enrollment constraint keys on academicYearId, so a
+    // mismatched pair would leave the duplicate guard protecting a year the
+    // student has no classroom in.
+    if (classroom.academicYearId !== dto.academicYearId) {
+      const classroomYear = await this.prisma.academicYear.findFirst({
+        where: { id: classroom.academicYearId },
+        select: { label: true },
+      });
+      throw new ConflictException(
+        `Classroom '${classroom.displayName}' belongs to the ` +
+          `${classroomYear?.label ?? 'unknown'} academic year, not ` +
+          `${academicYear.label}. Pick a classroom from the selected year.`,
+      );
+    }
+
     // Determine the studentId to use (from DTO or from existing admission)
     const effectiveStudentId = dto.studentId ?? admission.studentId;
     if (!effectiveStudentId) {
@@ -244,8 +518,10 @@ export class AdmissionsService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
+        // Same constraint as EnrollmentsService.create — see the note there.
         throw new ConflictException(
-          'Student already has an active enrollment for this academic year',
+          'Student already has an active enrollment for this academic year. ' +
+            'Withdraw it before creating another one.',
         );
       }
       throw err;

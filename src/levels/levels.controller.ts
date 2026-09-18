@@ -5,12 +5,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { LevelsService } from './levels.service';
 import { CreateLevelDto } from './dto/create-level.dto';
+import { QueryLevelsDto } from './dto/query-levels.dto';
 import { UpdateLevelDto } from './dto/update-level.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -42,8 +44,11 @@ export class LevelsController {
 
   @Get()
   @RequirePermissions('levels.read')
-  async findAll(@CurrentUser() user: JwtPayload) {
-    const data = await this.levelsService.findAll(user.schoolId);
+  async findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: QueryLevelsDto,
+  ) {
+    const data = await this.levelsService.findAll(user.schoolId, query.includeArchived);
     return successResponse(data, 'Levels retrieved successfully');
   }
 
@@ -88,5 +93,21 @@ export class LevelsController {
       requestId,
     );
     return successResponse(data, 'Level archived successfully');
+  }
+
+  @Post(':id/restore')
+  @RequirePermissions('levels.archive')
+  async restore(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.levelsService.restore(
+      id,
+      user.sub,
+      user.schoolId,
+      req.requestId,
+    );
+    return successResponse(data, 'Level restored successfully');
   }
 }

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
@@ -287,14 +288,21 @@ export class AuthService {
 
     const rawToken = generateSecureToken();
     const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const RESET_TOKEN_MINUTES = 60;
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_MINUTES * 60 * 1000);
+
+    // `channel` now records how the token was actually DELIVERED. Phase 1 wrote
+    // `email` unconditionally while sending nothing at all; SMS is the only
+    // channel Brite can currently deliver on, so it is the honest value when a
+    // phone number exists.
+    const deliverBySms = !!user.phone;
 
     await this.prisma.authToken.create({
       data: {
         schoolId: user.schoolId,
         userId: user.id,
         type: AuthTokenType.password_reset,
-        channel: AuthTokenChannel.email,
+        channel: deliverBySms ? AuthTokenChannel.sms : AuthTokenChannel.email,
         email: dto.email || user.email,
         phone: dto.phone || user.phone,
         tokenHash,

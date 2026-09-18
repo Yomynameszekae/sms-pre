@@ -97,6 +97,22 @@ export class StudentsController {
     return successResponse(student, 'Student archived successfully');
   }
 
+  @Post(':id/restore')
+  @RequirePermissions('students.archive')
+  async restore(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.studentsService.restore(
+      id,
+      user.sub,
+      user.schoolId,
+      req.requestId,
+    );
+    return successResponse(data, 'Student restored successfully');
+  }
+
   @Get(':id/guardians')
   @RequirePermissions('students.read')
   async getGuardians(@Param('id') id: string, @CurrentUser() user: JwtPayload) {

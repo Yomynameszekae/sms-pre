@@ -14,6 +14,7 @@ import { AdmissionsService } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { UpdateAdmissionDto } from './dto/update-admission.dto';
 import { OfferAdmissionDto } from './dto/offer-admission.dto';
+import { TransitionNotesDto } from './dto/transition-admission.dto';
 import { EnrollAdmissionDto } from './dto/enroll-admission.dto';
 import { QueryAdmissionsDto } from './dto/query-admissions.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -100,6 +101,90 @@ export class AdmissionsController {
       (req as any).requestId,
     );
     return successResponse(data, 'Admission offer made successfully');
+  }
+
+  @Post(':id/apply')
+  @RequirePermissions('admissions.update')
+  async apply(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+  ) {
+    const data = await this.admissionsService.apply(
+      id,
+      user.sub,
+      user.schoolId,
+      (req as any).requestId,
+    );
+    return successResponse(data, 'Admission moved to application');
+  }
+
+  @Post(':id/revert-offer')
+  @RequirePermissions('admissions.approve')
+  async revertOffer(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+  ) {
+    const data = await this.admissionsService.revertOffer(
+      id,
+      user.sub,
+      user.schoolId,
+      (req as any).requestId,
+    );
+    return successResponse(data, 'Offer reverted');
+  }
+
+  @Post(':id/reject')
+  @RequirePermissions('admissions.update')
+  async reject(
+    @Param('id') id: string,
+    @Body() dto: TransitionNotesDto,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+  ) {
+    const data = await this.admissionsService.reject(
+      id,
+      dto,
+      user.sub,
+      user.schoolId,
+      (req as any).requestId,
+    );
+    return successResponse(data, 'Admission rejected');
+  }
+
+  @Post(':id/withdraw')
+  @RequirePermissions('admissions.update')
+  async withdraw(
+    @Param('id') id: string,
+    @Body() dto: TransitionNotesDto,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+  ) {
+    const data = await this.admissionsService.withdraw(
+      id,
+      dto,
+      user.sub,
+      user.schoolId,
+      (req as any).requestId,
+    );
+    return successResponse(data, 'Admission withdrawn');
+  }
+
+  @Post(':id/revert-enrollment')
+  @RequirePermissions('admissions.enroll')
+  async revertEnrollment(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+  ) {
+    const data = await this.admissionsService.revertEnrollment(
+      id,
+      user.sub,
+      user.schoolId,
+      (req as any).requestId,
+    );
+    return successResponse(data, 'Enrollment reverted — admission back to offered');
   }
 
   @Post(':id/enroll')

@@ -155,35 +155,53 @@ export class StudentGuardiansService {
     schoolId: string,
     requestId?: string,
   ) {
-    await this.findStudentGuardian(id, schoolId);
+    const link = await this.findStudentGuardian(id, schoolId);
 
-    try {
-      const record = await this.prisma.studentGuardian.update({
-        where: { id },
-        data: { isPrimary: true },
-        include: {
-          student: true,
-          guardian: true,
-        },
+    // Two-step swap in one transaction, respecting
+    // uq_one_primary_guardian_per_student. An ARCHIVED guardian still holding
+    // the primary slot is an anomaly — its link is demoted silently. An
+    // ACTIVE guardian holding it is a deliberate state — displacing it stays
+    // an explicit 409, exactly as before.
+    let displaced: { id: string; guardianName: string } | null = null;
+    const record = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.studentGuardian.findFirst({
+        where: { studentId: link.studentId, isPrimary: true, NOT: { id } },
+        include: { guardian: { select: { archivedAt: true, firstName: true, lastName: true } } },
       });
-
-      await this.auditLogs.create({
-        schoolId,
-        userId,
-        requestId,
-        action: 'student_guardians.primary_set',
-        module: 'student-guardians',
-        entityType: 'studentGuardian',
-        entityId: record.id,
-      });
-
-      return record;
-    } catch (err) {
-      if (err?.code === 'P2002') {
+      if (current && !current.guardian.archivedAt) {
         throw new ConflictException('Student already has a primary guardian');
       }
-      throw err;
-    }
+      if (current) {
+        await tx.studentGuardian.update({
+          where: { id: current.id },
+          data: { isPrimary: false },
+        });
+        displaced = {
+          id: current.id,
+          guardianName: `${current.guardian.firstName} ${current.guardian.lastName}`,
+        };
+      }
+      return tx.studentGuardian.update({
+        where: { id },
+        data: { isPrimary: true },
+        include: { student: true, guardian: true },
+      });
+    });
+
+    await this.auditLogs.create({
+      schoolId,
+      userId,
+      requestId,
+      action: 'student_guardians.primary_set',
+      module: 'student-guardians',
+      entityType: 'studentGuardian',
+      entityId: record.id,
+      changes: displaced
+        ? { displacedArchivedGuardianLink: displaced }
+        : undefined,
+    });
+
+    return record;
   }
 
   async unlink(

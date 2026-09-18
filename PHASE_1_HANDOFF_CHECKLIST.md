@@ -385,7 +385,7 @@ These are intentional design decisions and constraints for Phase 1. Do not raise
 | Access tokens expire after 15 minutes | Re-login or use the refresh endpoint periodically during testing sessions. |
 | No bulk import | Students, staff, and guardians must be created one record at a time through the API. |
 | Single-school per environment | Phase 1 is built for one school per deployment. Multi-school or multi-branch support is a Phase 2 planning question. |
-| `admission.approvedBy` not populated | The offer flow records `offeredAt` and the acting user via `updatedBy`. The `approvedBy` staff FK field is reserved for Phase 2 when the auth context will expose the actor's staff ID. |
+| ~~`admission.approvedBy` not populated~~ (resolved in Phase 1B) | The offer flow now resolves the acting user's linked staff record and writes `approvedBy`/`approvedAt`; users without a staff link approve with a null staff FK, and the audit entry still records the user. |
 | Password reset token returned in API response | In Phase 1, the reset token is returned directly in the API response for testing purposes. Before exposing the reset flow to real users, Phase 2 must route this token through email or SMS delivery. |
 
 ---

@@ -16,7 +16,8 @@ const mockPrisma = {
   student: { findFirst: jest.fn() },
   classroom: { findFirst: jest.fn() },
   academicYear: { findFirst: jest.fn() },
-  enrollment: { create: jest.fn() },
+  enrollment: { create: jest.fn(), findFirst: jest.fn() },
+  user: { findUnique: jest.fn().mockResolvedValue({ linkedEntityType: 'staff', linkedEntityId: 'staff-1' }) },
   $transaction: jest.fn((ops) => Promise.all(ops)),
 };
 
@@ -54,22 +55,22 @@ describe('AdmissionsService', () => {
   });
 
   describe('offer — status state machine', () => {
-    it('throws BadRequestException when status is not enquiry or application', async () => {
+    it('throws ConflictException when status is not enquiry or application', async () => {
       mockPrisma.admissionApplication.findFirst.mockResolvedValue({
         id: 'adm1', schoolId: 'school-a', status: 'enrolled',
       });
       await expect(
         service.offer('adm1', {}, 'user-1', 'school-a'),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
 
-    it('throws BadRequestException when status is rejected', async () => {
+    it('throws ConflictException when status is rejected', async () => {
       mockPrisma.admissionApplication.findFirst.mockResolvedValue({
         id: 'adm1', schoolId: 'school-a', status: 'rejected',
       });
       await expect(
         service.offer('adm1', {}, 'user-1', 'school-a'),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
 
     it('allows offer when status is enquiry', async () => {
@@ -112,8 +113,8 @@ describe('AdmissionsService', () => {
 
     it('throws NotFoundException when student belongs to different school', async () => {
       mockPrisma.student.findFirst.mockResolvedValue(null); // school-b student not found in school-a
-      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a' });
-      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a' });
+      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a', displayName: 'Basic 3A', academicYearId: 'ay1' });
+      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a', label: '2025/2026', endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000) });
 
       await expect(
         service.enroll(
@@ -128,7 +129,7 @@ describe('AdmissionsService', () => {
     it('throws NotFoundException when classroom belongs to different school', async () => {
       mockPrisma.student.findFirst.mockResolvedValue({ id: 'st1', schoolId: 'school-a' });
       mockPrisma.classroom.findFirst.mockResolvedValue(null); // different school classroom
-      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a' });
+      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a', label: '2025/2026', endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000) });
 
       await expect(
         service.enroll(
@@ -142,7 +143,7 @@ describe('AdmissionsService', () => {
 
     it('throws NotFoundException when academicYear belongs to different school', async () => {
       mockPrisma.student.findFirst.mockResolvedValue({ id: 'st1', schoolId: 'school-a' });
-      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a' });
+      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a', displayName: 'Basic 3A', academicYearId: 'ay1' });
       mockPrisma.academicYear.findFirst.mockResolvedValue(null); // different school
 
       await expect(
@@ -157,8 +158,8 @@ describe('AdmissionsService', () => {
 
     it('throws ConflictException on P2002 (duplicate active enrollment)', async () => {
       mockPrisma.student.findFirst.mockResolvedValue({ id: 'st1', schoolId: 'school-a' });
-      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a' });
-      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a' });
+      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a', displayName: 'Basic 3A', academicYearId: 'ay1' });
+      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a', label: '2025/2026', endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000) });
 
       const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint', {
         code: 'P2002',
@@ -179,8 +180,8 @@ describe('AdmissionsService', () => {
 
     it('creates enrollment and marks admission as enrolled on success', async () => {
       mockPrisma.student.findFirst.mockResolvedValue({ id: 'st1', schoolId: 'school-a' });
-      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a' });
-      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a' });
+      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a', displayName: 'Basic 3A', academicYearId: 'ay1' });
+      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a', label: '2025/2026', endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000) });
       mockPrisma.enrollment.create.mockResolvedValue({ id: 'enr1', studentId: 'st1' });
       mockPrisma.admissionApplication.update.mockResolvedValue({
         id: 'adm1', status: 'enrolled', enrolledAt: new Date(),
@@ -206,8 +207,8 @@ describe('AdmissionsService', () => {
       mockPrisma.admissionApplication.findFirst.mockResolvedValue({
         id: 'adm1', schoolId: 'school-a', status: 'offered', studentId: null,
       });
-      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a' });
-      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a' });
+      mockPrisma.classroom.findFirst.mockResolvedValue({ id: 'cls1', schoolId: 'school-a', displayName: 'Basic 3A', academicYearId: 'ay1' });
+      mockPrisma.academicYear.findFirst.mockResolvedValue({ id: 'ay1', schoolId: 'school-a', label: '2025/2026', endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000) });
 
       await expect(
         service.enroll(

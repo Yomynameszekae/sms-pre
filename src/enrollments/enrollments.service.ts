@@ -55,6 +55,33 @@ export class EnrollmentsService {
       );
     }
 
+
+    // Enrollments may be created for the active year, a not-yet-activated
+    // current year, or a future year (pre-enrollment is the admissions
+    // season). Only a year that has already ENDED is refused.
+    if (academicYear.endDate < new Date()) {
+      throw new ConflictException(
+        `Cannot enroll into ${academicYear.label}: the academic year ended on ` +
+          `${academicYear.endDate.toISOString().slice(0, 10)}.`,
+      );
+    }
+
+    // The classroom must belong to the selected academic year. The
+    // one-active-enrollment constraint keys on academicYearId, so a
+    // mismatched pair would leave the duplicate guard protecting a year the
+    // student has no classroom in.
+    if (classroom.academicYearId !== dto.academicYearId) {
+      const classroomYear = await this.prisma.academicYear.findFirst({
+        where: { id: classroom.academicYearId },
+        select: { label: true },
+      });
+      throw new ConflictException(
+        `Classroom '${classroom.displayName}' belongs to the ` +
+          `${classroomYear?.label ?? 'unknown'} academic year, not ` +
+          `${academicYear.label}. Pick a classroom from the selected year.`,
+      );
+    }
+
     try {
       const enrollment = await this.prisma.enrollment.create({
         data: {
@@ -86,8 +113,13 @@ export class EnrollmentsService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
+        // The binding constraint is uq_one_active_enrollment_per_student_year:
+        // UNIQUE (student_id, academic_year_id) WHERE status = 'active'.
+        // It applies regardless of curriculum track — withdraw the existing
+        // enrollment before creating another one for the same year.
         throw new ConflictException(
-          'Student already has an active enrollment for this academic year and curriculum track',
+          'Student already has an active enrollment for this academic year. ' +
+            'Withdraw it before creating another one.',
         );
       }
       throw err;

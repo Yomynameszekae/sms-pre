@@ -1,5 +1,6 @@
 import {
   Injectable,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -172,6 +173,42 @@ export class ClassroomsService {
     return updated;
   }
 
+  /**
+   * Inverse of archive. Restoring under an archived level is refused — level
+   * dropdowns list active levels only, so the classroom would reference an
+   * invisible parent. Year state is deliberately NOT checked: inactive years
+   * include future ones, and blocking on them would be wrong.
+   */
+  async restore(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (existing.isActive) {
+      throw new ConflictException('Classroom is not archived');
+    }
+
+    const level = await this.prisma.level.findFirst({
+      where: { id: existing.levelId, schoolId },
+    });
+    if (level && !level.isActive) {
+      throw new ConflictException(`Restore the level '${level.name}' first.`);
+    }
+
+    const classroom = await this.prisma.classroom.update({
+      where: { id },
+      data: { isActive: true, updatedBy: userId },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'classrooms.restored',
+      module: 'classrooms',
+      entityType: 'classroom',
+      entityId: id,
+      changes: { before: { isActive: false }, after: { isActive: true } },
+    });
+
+    return classroom;
+  }
+
   async assignTeacher(
     id: string,
     staffId: string,
@@ -188,6 +225,15 @@ export class ClassroomsService {
     if (!staff) {
       throw new NotFoundException(
         'Staff member not found or does not belong to this school',
+      );
+    }
+
+    // Only active staff can receive new assignments. An EXISTING assignment
+    // survives the teacher's termination (persist-with-flag: history of who
+    // taught the class is kept; the Assign Teacher dialog flags them).
+    if (staff.status !== 'active') {
+      throw new ConflictException(
+        `Cannot assign ${staff.firstName} ${staff.lastName}: staff member is ${staff.status.replace('_', ' ')}`,
       );
     }
 

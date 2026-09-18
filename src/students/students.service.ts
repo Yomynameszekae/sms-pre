@@ -9,6 +9,10 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { getPaginationParams, paginate } from '../common/utils/pagination.util';
+import {
+  nextDocumentNumber,
+  isUniqueViolationOn,
+} from '../common/utils/document-number.util';
 import { EnrollmentStatus } from '@prisma/client';
 
 @Injectable()
@@ -25,24 +29,7 @@ export class StudentsService {
     requestId?: string,
   ) {
     try {
-      const student = await this.prisma.student.create({
-        data: {
-          schoolId,
-          studentNumber: dto.studentNumber,
-          firstName: dto.firstName,
-          middleName: dto.middleName,
-          lastName: dto.lastName,
-          preferredName: dto.preferredName,
-          dateOfBirth: new Date(dto.dateOfBirth),
-          gender: dto.gender,
-          nationality: dto.nationality,
-          religion: dto.religion,
-          ghanaCardId: dto.ghanaCardId,
-          previousSchool: dto.previousSchool,
-          admissionDate: dto.admissionDate ? new Date(dto.admissionDate) : undefined,
-          createdBy: userId,
-        },
-      });
+      const student = await this.createWithNumber(dto, userId, schoolId);
 
       await this.auditLogs.create({
         schoolId,
@@ -66,15 +53,71 @@ export class StudentsService {
     }
   }
 
+
+  /**
+   * Inserts the student, auto-claiming the next STU number when the DTO does
+   * not provide one. The claim and the insert share one transaction; a P2002
+   * on an auto-claimed number (a manual number occupying the sequence's path)
+   * is retried with the next value, bounded.
+   */
+  private async createWithNumber(
+    dto: CreateStudentDto,
+    userId: string,
+    schoolId: string,
+  ) {
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const studentNumber =
+            dto.studentNumber ??
+            (await nextDocumentNumber(tx, schoolId, 'student_number'));
+          return tx.student.create({
+            data: {
+              schoolId,
+              studentNumber,
+              firstName: dto.firstName,
+              middleName: dto.middleName,
+              lastName: dto.lastName,
+              preferredName: dto.preferredName,
+              dateOfBirth: new Date(dto.dateOfBirth),
+              gender: dto.gender,
+              nationality: dto.nationality,
+              religion: dto.religion,
+              ghanaCardId: dto.ghanaCardId,
+              previousSchool: dto.previousSchool,
+              admissionDate: dto.admissionDate ? new Date(dto.admissionDate) : undefined,
+              createdBy: userId,
+            },
+          });
+        });
+      } catch (err) {
+        // Only retry when WE chose the number; a user-provided duplicate is
+        // a real conflict the caller must hear about.
+        if (
+          !dto.studentNumber &&
+          attempt < MAX_ATTEMPTS &&
+          isUniqueViolationOn(err, /student_number/)
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
   async findAll(schoolId: string, query: QueryStudentsDto) {
     const { skip, take } = getPaginationParams(query.page, query.limit);
 
     const where: any = { schoolId };
     if (query.status) where.status = query.status;
     if (query.search) {
+      // The UI offers "Search students by name or number…", so studentNumber
+      // is matched on the same terms as the names: partial, case-insensitive.
       where.OR = [
         { firstName: { contains: query.search, mode: 'insensitive' } },
         { lastName: { contains: query.search, mode: 'insensitive' } },
+        { studentNumber: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
@@ -178,6 +221,37 @@ export class StudentsService {
       module: 'students',
       entityType: 'student',
       entityId: student.id,
+    });
+
+    return student;
+  }
+
+  /**
+   * Inverse of archive. Fixed restore state: status='active', archivedAt
+   * cleared. A student who is withdrawn WITHOUT being archived is untouched
+   * by this — restore only applies to archived records.
+   */
+  async restore(id: string, userId: string, schoolId: string, requestId?: string) {
+    const existing = await this.findOne(id, schoolId);
+    if (!existing.archivedAt) {
+      throw new ConflictException('Student is not archived');
+    }
+
+    const student = await this.prisma.student.update({
+      where: { id },
+      data: { status: 'active', archivedAt: null, updatedBy: userId },
+    });
+
+    await this.auditLogs.create({
+      schoolId, userId, requestId,
+      action: 'students.restored',
+      module: 'students',
+      entityType: 'student',
+      entityId: id,
+      changes: {
+        before: { status: existing.status, archivedAt: existing.archivedAt },
+        after: { status: 'active', archivedAt: null },
+      },
     });
 
     return student;

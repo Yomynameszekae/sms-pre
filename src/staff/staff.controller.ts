@@ -93,4 +93,20 @@ export class StaffController {
     );
     return successResponse(staff, 'Staff member archived successfully');
   }
+
+  @Post(':id/restore')
+  @RequirePermissions('staff.archive')
+  async restore(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.staffService.restore(
+      id,
+      user.sub,
+      user.schoolId,
+      req.requestId,
+    );
+    return successResponse(data, 'Staff member restored successfully');
+  }
 }
