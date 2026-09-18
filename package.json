@@ -14,6 +14,7 @@
     "prisma:migrate:raw": "node scripts/apply-raw-migration.js",
     "prisma:generate": "npx prisma generate",
     "prisma:seed": "ts-node --project tsconfig.json -r tsconfig-paths/register prisma/seed.ts",
+    "seed:demo": "ts-node --project tsconfig.json -r tsconfig-paths/register prisma/seed-demo.ts",
     "backfill:admission-numbers": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/backfill-admission-numbers.ts",
     "prisma:studio": "npx prisma studio",
     "db:raw-sql": "node scripts/apply-raw-migration.js",
