@@ -80,6 +80,46 @@ const PERMISSIONS = [
   { key: 'files.read', module: 'files' },
   { key: 'files.archive', module: 'files' },
   { key: 'audit_logs.read', module: 'audit_logs' },
+  // Phase 2 Stage 1a — Label (shared classification, fees consume it later).
+  { key: 'labels.create', module: 'labels' },
+  { key: 'labels.read', module: 'labels' },
+  { key: 'labels.update', module: 'labels' },
+  { key: 'labels.archive', module: 'labels' },
+  // Phase 2 Stage 1a — attendance register.
+  //
+  // The `_any` keys are SCOPE ESCALATORS, not duplicates: without one, a
+  // holder may only touch classrooms they are the class teacher of
+  // (Classroom.classTeacherId → their linked Staff row). The ownership test
+  // itself lives in AttendanceService, not in PermissionsGuard.
+  //
+  // There is deliberately NO `attendance.reopen_term` key. Reopening a closed
+  // term is restricted to the SUPER_ADMIN *role*, because SCHOOL_ADMIN below
+  // is granted every permission in this list and would inherit a new key
+  // automatically.
+  { key: 'attendance.read', module: 'attendance' },
+  { key: 'attendance.read_any', module: 'attendance' },
+  { key: 'attendance.mark', module: 'attendance' },
+  { key: 'attendance.mark_any', module: 'attendance' },
+  // Phase 2 Stage 1b — fees, billing and invoices.
+  // `reconcile` also governs editing one child's amountDue: both are the
+  // authority to change what a specific student owes.
+  // Separate from `create`: reversing a receipt a parent is holding is a
+  // materially different act from recording a payment, and it is the one a
+  // school will want to restrict.
+  // Separate from `fee_assignments.read`: the level billing summary and the
+  // ledger expose the whole school's money, which is not the same authority
+  // as looking up one child's bill.
+  // Withdrawing a numbered document a parent is holding. Correcting an
+  // invoice needs BOTH this and `invoices.create` — there is deliberately no
+  // third key for it.
+  // Phase 2 — SMS notification layer.
+  // Separate from `read` because triggering is COST-BEARING: every fire is a
+  // paid message. Seeing the log and spending the school's money are not the
+  // same authority.
+  // Recording or withdrawing a guardian's SMS consent. Separate from
+  // `guardians.update` because consent is a legal record attributable to the
+  // member of staff who obtained it, not an ordinary field edit.
+  { key: 'guardians.consent_manage', module: 'guardians' },
 ];
 
 const ROLES = [
@@ -91,9 +131,13 @@ const ROLES = [
   { code: 'ADMISSIONS_OFFICER', name: 'Admissions Officer', description: 'Admissions and enrollment access' },
   { code: 'PARENT_GUARDIAN', name: 'Parent/Guardian', description: 'Limited read access to linked students' },
   { code: 'COMPLIANCE_OFFICER', name: 'Compliance Officer', description: 'Audit and compliance read access' },
+  // Phase 2 Stage 1b. The first role added since the Phase 1 seed. The point
+  // is a finance user who can take money but cannot edit a child's record.
+  { code: 'BURSAR', name: 'Bursar', description: 'Fees, payments and invoicing' },
 ];
 
-// Permissions per role based on PERMISSIONS_MATRIX_PHASE_1.md
+// Permissions per role. This file is the source of truth; the table in
+// starter-docs/PERMISSIONS_MATRIX.md mirrors it and must be kept in step.
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   SUPER_ADMIN: PERMISSIONS.map((p) => p.key),
   SCHOOL_ADMIN: PERMISSIONS.map((p) => p.key),
@@ -101,25 +145,55 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'school.read', 'academic_years.read', 'terms.read', 'levels.read', 'classrooms.read',
     'staff.read', 'students.read', 'guardians.read', 'admissions.read', 'admissions.approve',
     'enrollments.read', 'files.read', 'audit_logs.read',
+    // Read-only across every classroom, in keeping with the rest of this role.
+    'labels.read', 'attendance.read_any',
+    // Read-only oversight of the school's money. No create, no payment,
+    // no cancel.
   ],
   ACADEMIC_COORDINATOR: [
     'academic_years.read', 'terms.read', 'levels.create', 'levels.read', 'levels.update', 'levels.archive',
     'classrooms.create', 'classrooms.read', 'classrooms.update', 'classrooms.assign_teacher', 'classrooms.archive',
     'staff.read', 'students.read', 'guardians.read',
     'enrollments.create', 'enrollments.read', 'enrollments.update', 'enrollments.withdraw',
+    // Oversees every classroom's register, and covers a teacher's absence.
+    'labels.read', 'attendance.read_any', 'attendance.mark_any',
   ],
-  CLASS_TEACHER: ['classrooms.read', 'students.read', 'guardians.read', 'enrollments.read', 'files.read'],
+  CLASS_TEACHER: [
+    'classrooms.read', 'students.read', 'guardians.read', 'enrollments.read', 'files.read',
+    // Scoped, NOT `_any`: the service restricts these to classrooms where
+    // this teacher is Classroom.classTeacherId.
+    'attendance.read', 'attendance.mark',
+  ],
   ADMISSIONS_OFFICER: [
     'students.create', 'students.read', 'students.update',
     'guardians.create', 'guardians.read', 'guardians.update',
     'student_guardians.manage',
+    // Front desk: they enrol the family, so they are who actually asks the
+    // consent question and records the answer.
     'admissions.create', 'admissions.read', 'admissions.update', 'admissions.enroll',
     'document_sequences.generate',
     'enrollments.create', 'enrollments.read',
     'files.upload', 'files.read',
   ],
+  // No attendance grants in this stage. The guardian portal is out of scope,
+  // and this role holds a school-wide `enrollments.read`, so any attendance
+  // key here would expose every child's register, not just their own.
   PARENT_GUARDIAN: ['students.read', 'guardians.read', 'files.read', 'enrollments.read'],
-  COMPLIANCE_OFFICER: ['audit_logs.read', 'students.read', 'guardians.read', 'staff.read', 'files.read'],
+  BURSAR: [
+    // The whole finance surface…
+    'labels.read',
+    // Sends the fee reminders and sees whether they arrived.
+    // …plus READ-ONLY on the records a bill has to name. A bursar can take
+    // money; a bursar cannot edit a child's record.
+    'students.read', 'guardians.read', 'enrollments.read', 'classrooms.read',
+    'levels.read', 'academic_years.read', 'terms.read',
+  ],
+  COMPLIANCE_OFFICER: [
+    'audit_logs.read', 'students.read', 'guardians.read', 'staff.read', 'files.read',
+    // The register is an inspection artifact and this role exists for exactly
+    // that. Read-only, every classroom.
+    'labels.read', 'attendance.read_any',
+  ],
 };
 
 async function main() {

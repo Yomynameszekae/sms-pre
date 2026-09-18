@@ -155,6 +155,23 @@ enum FileOwnerType {
   @@map("file_owner_type")
 }
 
+enum LabelCategory {
+  fee
+  income
+  expenditure
+
+  @@map("label_category")
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+
+  @@map("attendance_status")
+}
+
 // =========================
 // SCHOOL SETUP
 // =========================
@@ -195,6 +212,8 @@ model School {
   enrollments       Enrollment[]
   auditLogs         AuditLog[]
   files             File[]
+  labels            Label[]
+  attendanceRecords AttendanceRecord[]
 
   @@index([isActive])
   @@map("schools")
@@ -770,6 +789,8 @@ model Enrollment {
   classroom    Classroom    @relation(fields: [classroomId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
 
+  attendanceRecords AttendanceRecord[]
+
   // NOTE — two unique constraints govern this table, and only one of them can
   // be expressed here.
   //
@@ -880,5 +901,124 @@ model AuditLog {
   @@index([schoolId, action])
   @@index([schoolId, entityType, entityId])
   @@map("audit_logs")
+}
+
+// =========================
+// LABELS (shared classification)
+// =========================
+
+/// A shared section heading. Its CATEGORY decides which part of a future
+/// profit-and-loss statement a line rolls up to.
+///
+/// Stage 1a ships all three categories but only ONE consumer (`FeeType`, when
+/// fees land). `income` and `expenditure` exist now because adding a Postgres
+/// enum value later is effectively irreversible, and because a table with a
+/// single category value is a fee-category table wearing the name `Label`.
+/// Do not build the income/expenditure consumers here.
+///
+/// NOTE — uniqueness is NOT declared on this model. The only rule is the raw
+/// SQL expression index `uq_label_school_category_name_lower`
+/// (school_id, category, lower(name)) in
+/// starter-docs/phase_2_required_raw_sql_migrations.sql. Prisma has no syntax
+/// for an expression index, and declaring a second, weaker @@unique alongside
+/// it would leave two overlapping rules where one is wanted. Uniqueness is
+/// scoped PER CATEGORY on purpose: "Transport" must be able to be both an
+/// income heading and an expenditure heading.
+model Label {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+
+  category    LabelCategory
+  name        String        @db.VarChar(120)
+  description String?
+  isActive    Boolean       @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school   School    @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+  @@index([schoolId, category])
+  @@map("labels")
+}
+
+// =========================
+// ATTENDANCE
+// =========================
+
+/// One row per student per date. Keyed to `Enrollment`, never to `Level` (the
+/// register belongs to Basic 3A, not to Basic 3) and never to `Student` alone
+/// (the classroom has to come from somewhere).
+///
+/// Why `enrollmentId` is a COMPLETE key today: Brite cannot represent a
+/// mid-year classroom transfer. `@@unique([studentId, academicYearId,
+/// curriculumTrack])` on Enrollment is a plain, non-partial unique, so a
+/// withdrawn row still occupies the slot and a second enrollment cannot be
+/// inserted; and `UpdateEnrollmentDto` accepts `status` only, so no endpoint
+/// rewrites `classroomId` after creation. For any (student, date) inside a
+/// year the classroom is therefore unambiguous.
+///
+/// If a later phase adds mid-year transfers, that change must decide what
+/// happens here: either a transfer creates a second enrollment row (history
+/// stays correctly attached to the old classroom) or it mutates `classroomId`
+/// in place (past attendance silently re-attributes to the new classroom).
+/// Do not add a denormalised `classroomId` to this table pre-emptively.
+///
+/// Corrections are IN PLACE, with before/after captured in `audit_logs` under
+/// `attendance.amended`. There is deliberately no history table and no
+/// `markedBy`/`amendedBy` pair: `createdBy`/`createdAt` are who marked it,
+/// `updatedBy`/`updatedAt` are who amended it, and `updatedAt > createdAt` is
+/// "this row was amended".
+///
+/// There is deliberately no `not_marked` status either — the absence of a row
+/// IS "not marked". The register composes the roster against these rows and
+/// renders the misses.
+model AttendanceRecord {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+
+  enrollmentId   String   @map("enrollment_id") @db.Uuid
+  attendanceDate DateTime @map("attendance_date") @db.Date
+
+  // A row says one thing about each HALF of the day, not one thing about the
+  // day. Part B replaced the single `status`/`reason` pair with two; there is
+  // no day-level column left to disagree with them.
+  //
+  // Both sessions are ALWAYS stored. The API lets a caller omit `afternoon`
+  // (it then mirrors `morning`), but nothing reaches this table half-stated:
+  // `afternoon_status` is NOT NULL with deliberately no DEFAULT, so a future
+  // insert cannot silently create a row with an unstated afternoon.
+  //
+  // `afternoonReason` is not mirrored from `morningReason`. A note explains
+  // the session that deviated; copying it would assert something about the
+  // other session that nobody recorded.
+  morningStatus AttendanceStatus @map("morning_status")
+  morningReason String?          @map("morning_reason") @db.VarChar(255)
+
+  afternoonStatus AttendanceStatus @map("afternoon_status")
+  afternoonReason String?          @map("afternoon_reason") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school     School     @relation(fields: [schoolId], references: [id])
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  // One record per student per date. Prisma CAN express this one, so it lives
+  // here rather than in the raw-SQL set — unlike the Label index above.
+  //
+  // The companion rule "attendance_date must not be in the future" is NOT a
+  // CHECK constraint: Postgres rejects non-immutable functions such as
+  // CURRENT_DATE in check constraints. It is enforced in AttendanceService.
+  @@unique([enrollmentId, attendanceDate])
+  @@index([schoolId])
+  @@index([enrollmentId])
+  @@index([schoolId, attendanceDate])
+  @@map("attendance_records")
 }
 

@@ -1,0 +1,925 @@
+{
+  "capturedAt": "2026-09-18T13:57:45.546Z",
+  "note": "Captured from the seeded demo database BEFORE the Part B session-level migration, using the Stage 1a day-level summariseRecords(). oldSummary values are what a term summary printed at that moment. The rate-neutrality test replays these rows through the backfill (afternoon := morning) and the new session-level rule, and every rate must come out identical.",
+  "totalRows": 159,
+  "students": [
+    {
+      "enrollmentId": "20765d17-e7a9-496b-abea-103c799a9126",
+      "classroom": "Basic 1A",
+      "studentNumber": "STU-0004",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "7b944bee-fa52-4ae6-b5ff-dbda848b8d12",
+      "classroom": "Basic 1A",
+      "studentNumber": "STU-0005",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 6,
+        "absent": 1,
+        "late": 2,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "2f5498a5-ac78-4a8a-bffc-4fc9cab22899",
+      "classroom": "Basic 1A",
+      "studentNumber": "STU-0006",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 6,
+        "absent": 1,
+        "late": 2,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "37b61398-72f1-40d7-a239-bccd74be6f05",
+      "classroom": "Basic 3A",
+      "studentNumber": "STU-0007",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "excused"
+        }
+      ],
+      "oldSummary": {
+        "present": 6,
+        "absent": 1,
+        "late": 2,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "55359cb8-9a3a-4ce5-8168-60729367bb80",
+      "classroom": "Basic 3A",
+      "studentNumber": "STU-0008",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "463103ac-6d97-42ad-ace6-9fc18c476967",
+      "classroom": "Basic 3A",
+      "studentNumber": "STU-0009",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 8,
+        "absent": 0,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "c4081f01-f5eb-4710-ac1b-a33097e231c6",
+      "classroom": "Basic 3B",
+      "studentNumber": "STU-0010",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 8,
+        "absent": 0,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "cfa1f891-a1ed-4298-8a74-196b35dc49e4",
+      "classroom": "Basic 3B",
+      "studentNumber": "STU-0011",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "05d9b601-bdbd-41cc-847c-a84bd6a51cfb",
+      "classroom": "Basic 3B",
+      "studentNumber": "STU-0012",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 8,
+        "absent": 0,
+        "late": 1,
+        "excused": 0,
+        "daysMarked": 9,
+        "daysPresent": 9,
+        "daysAbsent": 0,
+        "attendanceRate": 100
+      }
+    },
+    {
+      "enrollmentId": "bac01a96-cf6e-4754-9191-74137479c1c2",
+      "classroom": "Basic 6A",
+      "studentNumber": "STU-0013",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "absent"
+        }
+      ],
+      "oldSummary": {
+        "present": 8,
+        "absent": 1,
+        "late": 1,
+        "excused": 0,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "06a45d66-05dd-4f6c-9df5-069069e61dcc",
+      "classroom": "Basic 6A",
+      "studentNumber": "STU-0014",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 8,
+        "absent": 0,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "9ed4f8f6-ccb7-4efa-9650-22c952d14b90",
+      "classroom": "JHS 1A",
+      "studentNumber": "STU-0015",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 2,
+        "excused": 0,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "3e70861b-3f77-428a-8dd5-a7ea9c24d24d",
+      "classroom": "JHS 1A",
+      "studentNumber": "STU-0016",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "late"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 2,
+        "excused": 0,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "26b72c4d-6ced-4b1f-8ef3-b89647d25dea",
+      "classroom": "KG 2A",
+      "studentNumber": "STU-0001",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 1,
+        "late": 1,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    },
+    {
+      "enrollmentId": "4b23a550-8fc6-4b28-b628-2251985bd08c",
+      "classroom": "KG 2A",
+      "studentNumber": "STU-0002",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "late"
+        }
+      ],
+      "oldSummary": {
+        "present": 7,
+        "absent": 0,
+        "late": 2,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 9,
+        "daysAbsent": 1,
+        "attendanceRate": 90
+      }
+    },
+    {
+      "enrollmentId": "63131f91-d653-4c12-9c93-d39ebf5909ab",
+      "classroom": "KG 2A",
+      "studentNumber": "STU-0003",
+      "days": [
+        {
+          "date": "2026-09-07",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-08",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-09",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-10",
+          "status": "absent"
+        },
+        {
+          "date": "2026-09-11",
+          "status": "late"
+        },
+        {
+          "date": "2026-09-14",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-15",
+          "status": "excused"
+        },
+        {
+          "date": "2026-09-16",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-17",
+          "status": "present"
+        },
+        {
+          "date": "2026-09-18",
+          "status": "present"
+        }
+      ],
+      "oldSummary": {
+        "present": 6,
+        "absent": 1,
+        "late": 2,
+        "excused": 1,
+        "daysMarked": 10,
+        "daysPresent": 8,
+        "daysAbsent": 2,
+        "attendanceRate": 80
+      }
+    }
+  ],
+  "overallOldSummary": {
+    "present": 113,
+    "absent": 11,
+    "late": 23,
+    "excused": 12,
+    "daysMarked": 159,
+    "daysPresent": 136,
+    "daysAbsent": 23,
+    "attendanceRate": 85.5
+  }
+}

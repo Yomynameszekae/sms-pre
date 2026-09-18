@@ -21,6 +21,8 @@ import { StudentGuardiansModule } from './student-guardians/student-guardians.mo
 import { AdmissionsModule } from './admissions/admissions.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { FilesModule } from './files/files.module';
+import { LabelsModule } from './labels/labels.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
@@ -46,6 +48,8 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     AdmissionsModule,
     EnrollmentsModule,
     FilesModule,
+    LabelsModule,
+    AttendanceModule,
     AuditLogsModule,
   ],
 })
