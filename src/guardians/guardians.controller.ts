@@ -14,6 +14,8 @@ import { GuardiansService } from './guardians.service';
 import { CreateGuardianDto } from './dto/create-guardian.dto';
 import { UpdateGuardianDto } from './dto/update-guardian.dto';
 import { QueryGuardiansDto } from './dto/query-guardians.dto';
+import { GrantConsentDto } from '../notifications/dto/grant-consent.dto';
+import { RevokeConsentDto } from '../notifications/dto/revoke-consent.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -96,6 +98,59 @@ export class GuardiansController {
       req.requestId,
     );
     return successResponse(guardian, 'Guardian archived successfully');
+  }
+
+  @Post(':id/restore')
+  @RequirePermissions('guardians.archive')
+  async restore(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.guardiansService.restore(
+      id,
+      user.sub,
+      user.schoolId,
+      req.requestId,
+    );
+    return successResponse(data, 'Guardian restored successfully');
+  }
+
+  /**
+   * Record SMS consent. Its own action with a mandatory method — not a field
+   * on PATCH — because consent is a deliberate act that has to be attributable
+   * to the member of staff who obtained it.
+   */
+  @Post(':id/consent')
+  @RequirePermissions('guardians.consent_manage')
+  async grantConsent(
+    @Param('id') id: string,
+    @Body() dto: GrantConsentDto,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.guardiansService.grantSmsConsent(
+      id, dto.smsConsentMethod, user.sub, user.schoolId, req.requestId,
+    );
+    return successResponse(data, 'SMS consent recorded');
+  }
+
+  /** Withdraw consent. Stops future sends immediately and cancels queued ones. */
+  @Delete(':id/consent')
+  @RequirePermissions('guardians.consent_manage')
+  async revokeConsent(
+    @Param('id') id: string,
+    @Body() dto: RevokeConsentDto,
+    @CurrentUser() user: JwtPayload,
+    @Req() req: any,
+  ) {
+    const data = await this.guardiansService.revokeSmsConsent(
+      id, dto.reason, user.sub, user.schoolId, req.requestId,
+    );
+    return successResponse(
+      data,
+      `SMS consent withdrawn. ${data.queuedMessagesCancelled} queued message(s) cancelled.`,
+    );
   }
 
   @Get(':id/students')

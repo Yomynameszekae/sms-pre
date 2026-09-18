@@ -11,6 +11,39 @@ import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 
 @Injectable()
 export class StudentGuardiansService {
+  /**
+   * `canReceiveSms` is GATED by the guardian's consent record.
+   *
+   * The flag means "this link is reachable about this child"; it does not and
+   * cannot mean "we are allowed to message this person" — that is the
+   * guardian's own decision, recorded on `Guardian` with a method and an
+   * actor. Letting the link flag be set true without consent would create a
+   * row that LOOKS messageable, which is exactly the appearance the enqueue
+   * gate then has to contradict.
+   *
+   * This is belt-and-braces, not the enforcement: the real gate is in
+   * NotificationsService.resolveRecipient, which re-reads consent at send
+   * time. Refusing here means a member of staff is told why immediately,
+   * rather than discovering it later in the suppressed column of a log.
+   */
+  private async assertConsentAllowsSms(
+    guardianId: string,
+    schoolId: string,
+    canReceiveSms: boolean | undefined,
+  ) {
+    if (canReceiveSms !== true) return;
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { id: guardianId, schoolId },
+      select: { firstName: true, lastName: true, smsConsentGiven: true },
+    });
+    if (guardian && !guardian.smsConsentGiven) {
+      throw new ConflictException(
+        `${guardian.firstName} ${guardian.lastName} has not given SMS consent, so this link ` +
+          `cannot be set to receive SMS. Record consent on the guardian first.`,
+      );
+    }
+  }
+
   constructor(
     private prisma: PrismaService,
     private auditLogs: AuditLogsService,
@@ -46,6 +79,8 @@ export class StudentGuardiansService {
       throw new BadRequestException('Guardian does not belong to this school');
     }
 
+    await this.assertConsentAllowsSms(dto.guardianId, schoolId, dto.canReceiveSms);
+
     try {
       const studentGuardian = await this.prisma.studentGuardian.create({
         data: {
@@ -55,7 +90,9 @@ export class StudentGuardiansService {
           relationship: dto.relationship,
           isPrimary: dto.isPrimary ?? false,
           isEmergencyContact: dto.isEmergencyContact ?? false,
-          canReceiveSms: dto.canReceiveSms ?? true,
+          // Defaults to FALSE: a link cannot be born messageable, because
+          // consent has not been recorded at the moment a link is created.
+          canReceiveSms: dto.canReceiveSms ?? false,
           canAccessPortal: dto.canAccessPortal ?? true,
           createdBy: userId,
         },
@@ -109,7 +146,9 @@ export class StudentGuardiansService {
     schoolId: string,
     requestId?: string,
   ) {
-    await this.findStudentGuardian(id, schoolId);
+    const existing = await this.findStudentGuardian(id, schoolId);
+
+    await this.assertConsentAllowsSms(existing.guardianId, schoolId, dto.canReceiveSms);
 
     try {
       const record = await this.prisma.studentGuardian.update({

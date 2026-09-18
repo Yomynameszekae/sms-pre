@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsTriggers } from '../notifications/notifications.triggers';
 import { hashPassword, verifyPassword, hashToken, verifyTokenHash } from '../common/utils/hash.util';
 import { generateSecureToken } from '../common/utils/token.util';
 import { LoginDto } from './dto/login.dto';
@@ -20,11 +21,14 @@ import { Response, Request } from 'express';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private auditLogs: AuditLogsService,
+    private notificationsTriggers: NotificationsTriggers,
   ) {}
 
   private get cookieName(): string {
@@ -320,8 +324,34 @@ export class AuthService {
       actorType: 'user',
     });
 
-    // TODO: Phase 2 — send reset token via email/SMS
-    return { message: 'If the account exists, a reset token has been sent', _devToken: rawToken };
+    // Deliver it. The raw token leaves this method ONLY through the
+    // notification layer, and is never returned over HTTP.
+    //
+    // Phase 1 shipped `return { …, _devToken: rawToken }` under a TODO: the one
+    // place Brite was supposed to message a human, it handed the secret back to
+    // whoever asked instead — which made the reset flow usable by anyone who
+    // knew an email address. That is closed here.
+    if (deliverBySms) {
+      await this.notificationsTriggers.passwordReset({
+        schoolId: user.schoolId,
+        userId: user.id,
+        token: rawToken,
+        expiresInMinutes: RESET_TOKEN_MINUTES,
+        requestId: (req as any).requestId,
+      });
+    } else {
+      // No phone on the account and no email transport exists yet. The token
+      // is created and hashed; nobody can reach it. Logged as a warning
+      // because it is an operational dead end for that user, not a silent
+      // success — and the response stays identical either way, because
+      // varying it would leak whether the account exists.
+      this.logger.warn(
+        `Password reset requested for user ${user.id} but no deliverable channel exists`,
+      );
+    }
+
+    // Identical response in every branch, including "no such user" above.
+    return { message: 'If the account exists, a reset token has been sent' };
   }
 
   async confirmPasswordReset(dto: PasswordResetConfirmDto, req: Request) {

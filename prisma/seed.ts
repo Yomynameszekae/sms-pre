@@ -130,9 +130,11 @@ const PERMISSIONS = [
   // third key for it.
   { key: 'invoices.cancel', module: 'invoices' },
   // Phase 2 — SMS notification layer.
+  { key: 'notifications.read', module: 'notifications' },
   // Separate from `read` because triggering is COST-BEARING: every fire is a
   // paid message. Seeing the log and spending the school's money are not the
   // same authority.
+  { key: 'notifications.trigger', module: 'notifications' },
   // Recording or withdrawing a guardian's SMS consent. Separate from
   // `guardians.update` because consent is a legal record attributable to the
   // member of staff who obtained it, not an ordinary field edit.
@@ -168,6 +170,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     // no cancel.
     'fee_types.read', 'school_fees.read', 'fee_assignments.read',
     'fee_payments.read', 'fees.report', 'invoices.read',
+    'notifications.read',
   ],
   ACADEMIC_COORDINATOR: [
     'academic_years.read', 'terms.read', 'levels.create', 'levels.read', 'levels.update', 'levels.archive',
@@ -189,6 +192,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'student_guardians.manage',
     // Front desk: they enrol the family, so they are who actually asks the
     // consent question and records the answer.
+    'guardians.consent_manage',
     'admissions.create', 'admissions.read', 'admissions.update', 'admissions.enroll',
     'document_sequences.generate',
     'enrollments.create', 'enrollments.read',
@@ -208,6 +212,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'invoices.create', 'invoices.read', 'invoices.cancel',
     'labels.read',
     // Sends the fee reminders and sees whether they arrived.
+    'notifications.read', 'notifications.trigger',
     // …plus READ-ONLY on the records a bill has to name. A bursar can take
     // money; a bursar cannot edit a child's record.
     'students.read', 'guardians.read', 'enrollments.read', 'classrooms.read',

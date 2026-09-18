@@ -207,6 +207,60 @@ enum InvoiceStatus {
   @@map("invoice_status")
 }
 
+/// Ships with `sms` only. Adding `whatsapp` speculatively would be building
+/// toward a deliberately deferred item; it is an additive enum value when the
+/// day comes, and the gateway interface already isolates the difference.
+enum NotificationChannel {
+  sms
+
+  @@map("notification_channel")
+}
+
+/// RESERVED VALUES: `account_setup` and `announcement` have NO caller yet, and
+/// that is deliberate rather than an oversight — do not delete them as unused.
+/// Both are named in the notification-layer design, both already have a default
+/// template, and both reach the outbox through the same consent-gated
+/// `enqueue` path as everything else the day they are wired (`account_setup`
+/// needs a hook in account provisioning, `announcement` a recipient-selection
+/// endpoint). They ship now because adding a Postgres enum value later is
+/// effectively irreversible, so the alternative is a migration when the
+/// callers land.
+///
+/// DECLARATION ORDER IS THE DATABASE'S ORDER. `notification_trigger` already
+/// exists in Postgres with the order below; reordering here would put the
+/// schema out of step with the live type for no benefit.
+enum NotificationTrigger {
+  fee_reminder
+  fee_receipt
+  attendance_absence
+  account_setup // reserved — see above
+  password_reset
+  announcement // reserved — see above
+
+  @@map("notification_trigger")
+}
+
+/// `sent` and `delivered` are DIFFERENT states and only the first is
+/// universally available: `sent` means the gateway accepted the message,
+/// `delivered` means it reached the handset. Gateways that report nothing
+/// beyond acceptance leave rows at `sent` forever, which is honest.
+///
+/// `suppressed` is never-attempted — no consent, no usable number — and is
+/// deliberately distinct from `failed`, which means we tried and it did not
+/// work. Conflating them would hide a consent problem inside a delivery
+/// problem.
+enum NotificationStatus {
+  queued
+  sending
+  sent
+  delivered
+  failed
+  suppressed
+  cancelled
+
+  @@map("notification_status")
+}
+
 // =========================
 // SCHOOL SETUP
 // =========================
@@ -255,6 +309,7 @@ model School {
   feePayments       FeePayment[]
   invoices          Invoice[]
   invoiceLines      InvoiceLine[]
+  notifications     NotificationMessage[]
 
   @@index([isActive])
   @@map("schools")
@@ -456,6 +511,7 @@ model User {
   grantedRoles  UserRole[]            @relation("GrantedUserRoles")
   auditLogs     AuditLog[]
   uploadedFiles File[]                @relation("UploadedFiles")
+  notifications NotificationMessage[]
 
   @@index([schoolId])
   @@index([email])
@@ -697,6 +753,7 @@ model Student {
   guardians     StudentGuardian[]
   admissions    AdmissionApplication[]
   enrollments   Enrollment[]
+  notifications NotificationMessage[]
 
   @@unique([schoolId, studentNumber])
   @@index([schoolId])
@@ -720,6 +777,28 @@ model Guardian {
   occupation     String? @db.VarChar(150)
   address        String?
 
+  /// SMS CONSENT — a record, not a preference.
+  ///
+  /// It lives on `Guardian` and not on `StudentGuardian` (where the per-link
+  /// `canReceiveSms` lives) because consent is a property of the PERSON: a
+  /// guardian who consented for one child but not another has not given
+  /// coherent consent, and a revocation that has to find N link rows is a
+  /// revocation that can miss one. One row grants, one row revokes, totally
+  /// and immediately.
+  ///
+  /// `canReceiveSms` on the link remains per-child reachability and is GATED
+  /// by this: the enqueue path requires consent here AND the link flag. See
+  /// NotificationsService.resolveRecipient — the single place that check
+  /// exists.
+  ///
+  /// Revoking nulls the three detail columns and the immutable `audit_logs`
+  /// trail keeps the history, matching the house rule that the row is current
+  /// state and the audit is the story.
+  smsConsentGiven   Boolean   @default(false) @map("sms_consent_given")
+  smsConsentGivenAt DateTime? @map("sms_consent_given_at") @db.Timestamptz(6)
+  smsConsentGivenBy String?   @map("sms_consent_given_by") @db.Uuid
+  smsConsentMethod  String?   @map("sms_consent_method") @db.VarChar(60)
+
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -729,6 +808,7 @@ model Guardian {
 
   school        School                @relation(fields: [schoolId], references: [id])
   students      StudentGuardian[]
+  notifications NotificationMessage[]
 
   @@unique([schoolId, phonePrimary])
   @@index([schoolId])
@@ -1338,3 +1418,83 @@ model InvoiceLine {
   @@map("invoice_lines")
 }
 
+// =========================
+// NOTIFICATIONS (SMS)
+// =========================
+
+/// The outbox AND the delivery record — ONE table, not two.
+///
+/// They are the same row at different points in its life, and splitting them
+/// means reconciling two tables that must never disagree. This row is what
+/// answers "did the parent actually get told", which is the only question that
+/// matters when a school believes 300 reminders went out and 40 did not.
+///
+/// `toPhone` and `body` are FROZEN AT QUEUE TIME. When a parent says "I never
+/// got a message about the fees", the answer has to be what was actually sent
+/// to which number — not a re-render from data that has since changed.
+model NotificationMessage {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+
+  channel NotificationChannel @default(sms)
+  trigger NotificationTrigger
+  status  NotificationStatus  @default(queued)
+
+  guardianId String? @map("guardian_id") @db.Uuid
+  studentId  String? @map("student_id") @db.Uuid
+  userId     String? @map("user_id") @db.Uuid
+
+  /// E.164, normalised at queue time from whatever was stored. The stored
+  /// `Guardian.phonePrimary` is never rewritten — see the normalisation note
+  /// in notifications.phone.ts.
+  toPhone String @map("to_phone") @db.VarChar(30)
+  body    String
+
+  /// Computed at queue time, because SMS bills per SEGMENT and one non-GSM-7
+  /// character (a curly apostrophe pasted from a document) silently drops the
+  /// limit from 160 to 70 and can turn a one-segment message into three.
+  /// Storing it makes cost reportable per school without a second system.
+  segmentCount Int     @map("segment_count")
+  dedupeKey    String? @map("dedupe_key") @db.VarChar(160)
+
+  contextType String? @map("context_type") @db.VarChar(50)
+  contextId   String? @map("context_id") @db.Uuid
+  batchId     String? @map("batch_id") @db.Uuid
+
+  attemptCount      Int       @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  providerCode      String?   @map("provider_code") @db.VarChar(40)
+  providerMessageId String?   @map("provider_message_id") @db.VarChar(120)
+  lastError         String?   @map("last_error") @db.VarChar(255)
+
+  queuedAt    DateTime  @default(now()) @map("queued_at") @db.Timestamptz(6)
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz(6)
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+  failedAt    DateTime? @map("failed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  guardian Guardian? @relation(fields: [guardianId], references: [id])
+  student  Student?  @relation(fields: [studentId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+
+  // NOTE — idempotency is `uq_notification_dedupe`, a PARTIAL unique index on
+  // (school_id, dedupe_key) WHERE dedupe_key IS NOT NULL, in
+  // starter-docs/phase_2_required_raw_sql_migrations.sql. Prisma cannot
+  // express a partial index, and it has to hold at the DATABASE because the
+  // whole point is defending against a concurrent retry: a double-clicked
+  // "Send reminders" then costs one duplicate-key error, not 300 duplicate
+  // messages at full price.
+  @@index([schoolId])
+  @@index([schoolId, status])
+  // The poller's claim query: status + nextAttemptAt.
+  @@index([status, nextAttemptAt])
+  @@index([guardianId])
+  @@index([contextType, contextId])
+  @@index([batchId])
+  @@map("notification_messages")
+}

@@ -25,6 +25,7 @@ import { LabelsModule } from './labels/labels.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { FeesModule } from './fees/fees.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
@@ -54,6 +55,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     AttendanceModule,
     FeesModule,
     InvoicesModule,
+    NotificationsModule,
     AuditLogsModule,
   ],
 })

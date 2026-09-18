@@ -12,6 +12,155 @@ import { getPaginationParams, paginate } from '../common/utils/pagination.util';
 
 @Injectable()
 export class GuardiansService {
+  /**
+   * Record SMS consent for this guardian.
+   *
+   * Consent is a RECORD, not a preference toggle: who recorded it, when, and
+   * on what basis. The method matters because it is what a school would have
+   * to produce if anyone asked how consent was obtained — a boolean answers
+   * "may we message them", not "on what basis", and Act 843 cares about the
+   * second.
+   *
+   * Inbound SMS is deferred (there is no webhook, no short code, no keyword
+   * parser), so a guardian cannot reply YES to opt in. Staff capture it on
+   * their behalf, against their own user id, and the audit trail is the proof.
+   */
+  async grantSmsConsent(
+    id: string,
+    method: string,
+    userId: string,
+    schoolId: string,
+    requestId?: string,
+  ) {
+    const existing = await this.findOne(id, schoolId);
+
+    const guardian = await this.prisma.guardian.update({
+      where: { id },
+      data: {
+        smsConsentGiven: true,
+        smsConsentGivenAt: new Date(),
+        smsConsentGivenBy: userId,
+        smsConsentMethod: method,
+        updatedBy: userId,
+      },
+    });
+
+    await this.auditLogs.create({
+      schoolId,
+      userId,
+      requestId,
+      action: 'guardian.sms_consent_granted',
+      module: 'guardians',
+      entityType: 'guardian',
+      entityId: id,
+      changes: {
+        before: { smsConsentGiven: existing.smsConsentGiven },
+        after: { smsConsentGiven: true, smsConsentMethod: method },
+      },
+      metadata: {
+        guardian: `${existing.firstName} ${existing.lastName}`,
+        method,
+        // Named explicitly so the trail says WHO vouched for this, which is
+        // the whole point of a staff-captured consent record.
+        recordedBy: userId,
+      },
+    });
+
+    return guardian;
+  }
+
+  /**
+   * Withdraw consent. Takes effect on the NEXT send, not eventually.
+   *
+   * There is no cached consent anywhere: NotificationsService re-reads
+   * `smsConsentGiven` from the database inside every single enqueue. Revoking
+   * therefore stops future sends the moment this transaction commits, and the
+   * only messages that still go out are ones already sitting in the outbox —
+   * which is why this also CANCELS those.
+   *
+   * The three detail columns are nulled. The immutable `audit_logs` trail
+   * keeps the history of when consent was held and how it was obtained, per
+   * the house rule that the row is current state and the audit is the story.
+   */
+  async revokeSmsConsent(
+    id: string,
+    reason: string,
+    userId: string,
+    schoolId: string,
+    requestId?: string,
+  ) {
+    const existing = await this.findOne(id, schoolId);
+    if (!existing.smsConsentGiven) {
+      throw new ConflictException(
+        `${existing.firstName} ${existing.lastName} has not given SMS consent, so there is nothing to withdraw`,
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const guardian = await tx.guardian.update({
+        where: { id },
+        data: {
+          smsConsentGiven: false,
+          smsConsentGivenAt: null,
+          smsConsentGivenBy: null,
+          smsConsentMethod: null,
+          updatedBy: userId,
+        },
+      });
+
+      // Every link goes unreachable with them — a per-child flag cannot
+      // outlive the consent it depends on.
+      const links = await tx.studentGuardian.updateMany({
+        where: { guardianId: id, canReceiveSms: true },
+        data: { canReceiveSms: false },
+      });
+
+      // Anything already queued must not go out. A message sent after consent
+      // was withdrawn is the exact thing withdrawal exists to prevent, and
+      // "it was already in the queue" is not a defence anyone would accept.
+      const cancelled = await tx.notificationMessage.updateMany({
+        where: { guardianId: id, status: { in: ['queued', 'sending'] } },
+        data: {
+          status: 'cancelled',
+          lastError: 'SMS consent withdrawn before this message was sent',
+          nextAttemptAt: null,
+        },
+      });
+
+      return { guardian, linksDisabled: links.count, queuedCancelled: cancelled.count };
+    });
+
+    await this.auditLogs.create({
+      schoolId,
+      userId,
+      requestId,
+      action: 'guardian.sms_consent_revoked',
+      module: 'guardians',
+      entityType: 'guardian',
+      entityId: id,
+      changes: {
+        before: {
+          smsConsentGiven: true,
+          smsConsentMethod: existing.smsConsentMethod,
+          smsConsentGivenAt: existing.smsConsentGivenAt,
+        },
+        after: { smsConsentGiven: false },
+      },
+      metadata: {
+        guardian: `${existing.firstName} ${existing.lastName}`,
+        reason,
+        linksDisabled: result.linksDisabled,
+        queuedMessagesCancelled: result.queuedCancelled,
+      },
+    });
+
+    return {
+      ...result.guardian,
+      linksDisabled: result.linksDisabled,
+      queuedMessagesCancelled: result.queuedCancelled,
+    };
+  }
+
   constructor(
     private prisma: PrismaService,
     private auditLogs: AuditLogsService,

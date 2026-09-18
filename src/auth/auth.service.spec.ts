@@ -5,6 +5,7 @@ import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsTriggers } from '../notifications/notifications.triggers';
 import * as hashUtil from '../common/utils/hash.util';
 import * as tokenUtil from '../common/utils/token.util';
 
@@ -71,6 +72,9 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: AuditLogsService, useValue: mockAuditLogs },
+        // AuthService now delivers the password-reset token through the
+        // notification layer instead of returning it over HTTP.
+        { provide: NotificationsTriggers, useValue: { passwordReset: jest.fn() } },
       ],
     }).compile();
     service = module.get<AuthService>(AuthService);
