@@ -2,10 +2,28 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { hashPassword } from '../common/utils/hash.util';
+import { isUniqueViolationOn } from '../common/utils/document-number.util';
 import { getPaginationParams, paginate } from '../common/utils/pagination.util';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
+
+/**
+ * The user shape `create` and `update` return — both use the same `select`,
+ * so the type is declared once rather than inlined twice.
+ */
+type UserSummary = {
+  id: string;
+  schoolId: string;
+  email: string | null;
+  phone: string | null;
+  linkedEntityType: string;
+  linkedEntityId: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 @Injectable()
 export class UsersService {
@@ -14,35 +32,84 @@ export class UsersService {
     private auditLogs: AuditLogsService,
   ) {}
 
+  /**
+   * Turns a unique violation on one of the three user indexes into a 409 that
+   * names the offending field, instead of the 500 an unhandled P2002 produces.
+   *
+   * All three indexes are RAW SQL (see the inventory in README.md) — Prisma's
+   * schema declares none of them. That does not matter here: Prisma reports
+   * P2002 `meta.target` as the COLUMN LIST regardless of whether it owns the
+   * index, verified against the live database:
+   *
+   *   uq_users_school_email_lower   → ["school_id","lower(email::text)"]
+   *   uq_users_school_phone         → ["school_id","phone"]
+   *   uq_users_school_linked_entity → ["school_id","linked_entity_type","linked_entity_id"]
+   *
+   * So the hints below match column names, not index names — do not "fix" them
+   * to index names, and re-check them if any of those indexes is ever promoted
+   * into the Prisma schema.
+   *
+   * Returns the original error untouched when it is not one of these, so the
+   * caller always rethrows something.
+   */
+  private mapUniqueViolation(err: unknown, linkedEntityType?: string): unknown {
+    if (isUniqueViolationOn(err, /linked_entity_id/)) {
+      // The non-obvious one: the email is free but the staff/guardian already
+      // holds an account, so the message has to say which rule was hit.
+      const noun = linkedEntityType === 'guardian' ? 'guardian' : 'staff member';
+      return new ConflictException(
+        `This ${noun} already has a user account. Each ${noun} may only have one login.`,
+      );
+    }
+    // lower(email::text) — the index is case-insensitive, and the message says so.
+    if (isUniqueViolationOn(err, /email/)) {
+      return new ConflictException(
+        'A user with this email address already exists in this school (email is matched case-insensitively)',
+      );
+    }
+    if (isUniqueViolationOn(err, /phone/)) {
+      return new ConflictException(
+        'A user with this phone number already exists in this school',
+      );
+    }
+    return err;
+  }
+
   async create(dto: CreateUserDto, actorUserId: string, schoolId: string, requestId?: string) {
     const passwordHash = await hashPassword(dto.password);
 
-    const user = await this.prisma.user.create({
-      data: {
-        schoolId,
-        email: dto.email ?? null,
-        phone: dto.phone ?? null,
-        passwordHash,
-        linkedEntityType: dto.linkedEntityType as any,
-        linkedEntityId: dto.linkedEntityId,
-        isActive: true,
-        mustChangePassword: true,
-        createdBy: actorUserId,
-        updatedBy: actorUserId,
-      },
-      select: {
-        id: true,
-        schoolId: true,
-        email: true,
-        phone: true,
-        linkedEntityType: true,
-        linkedEntityId: true,
-        isActive: true,
-        mustChangePassword: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let user: UserSummary;
+
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          schoolId,
+          email: dto.email ?? null,
+          phone: dto.phone ?? null,
+          passwordHash,
+          linkedEntityType: dto.linkedEntityType as any,
+          linkedEntityId: dto.linkedEntityId,
+          isActive: true,
+          mustChangePassword: true,
+          createdBy: actorUserId,
+          updatedBy: actorUserId,
+        },
+        select: {
+          id: true,
+          schoolId: true,
+          email: true,
+          phone: true,
+          linkedEntityType: true,
+          linkedEntityId: true,
+          isActive: true,
+          mustChangePassword: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (err) {
+      throw this.mapUniqueViolation(err, dto.linkedEntityType);
+    }
 
     await this.auditLogs.create({
       schoolId,
@@ -146,28 +213,36 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto, actorUserId: string, schoolId: string, requestId?: string) {
-    await this.findOne(id, schoolId);
+    const existing = await this.findOne(id, schoolId);
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        ...(dto.email !== undefined && { email: dto.email }),
-        ...(dto.phone !== undefined && { phone: dto.phone }),
-        updatedBy: actorUserId,
-      },
-      select: {
-        id: true,
-        schoolId: true,
-        email: true,
-        phone: true,
-        linkedEntityType: true,
-        linkedEntityId: true,
-        isActive: true,
-        mustChangePassword: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    // Same exposure as create: `email` and `phone` are both editable and both
+    // carry a raw-SQL unique index, so an edit collides exactly as a create
+    // does. linkedEntity is not editable here, so it cannot fire.
+    let updated: UserSummary;
+    try {
+      updated = await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...(dto.email !== undefined && { email: dto.email }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+          updatedBy: actorUserId,
+        },
+        select: {
+          id: true,
+          schoolId: true,
+          email: true,
+          phone: true,
+          linkedEntityType: true,
+          linkedEntityId: true,
+          isActive: true,
+          mustChangePassword: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (err) {
+      throw this.mapUniqueViolation(err, existing.linkedEntityType);
+    }
 
     await this.auditLogs.create({
       schoolId,
