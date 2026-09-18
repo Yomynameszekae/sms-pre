@@ -23,6 +23,8 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { FilesModule } from './files/files.module';
 import { LabelsModule } from './labels/labels.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { FeesModule } from './fees/fees.module';
+import { InvoicesModule } from './invoices/invoices.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
@@ -50,6 +52,8 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     FilesModule,
     LabelsModule,
     AttendanceModule,
+    FeesModule,
+    InvoicesModule,
     AuditLogsModule,
   ],
 })

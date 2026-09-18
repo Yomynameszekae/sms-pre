@@ -101,17 +101,34 @@ const PERMISSIONS = [
   { key: 'attendance.mark', module: 'attendance' },
   { key: 'attendance.mark_any', module: 'attendance' },
   // Phase 2 Stage 1b — fees, billing and invoices.
+  { key: 'fee_types.create', module: 'fee_types' },
+  { key: 'fee_types.read', module: 'fee_types' },
+  { key: 'fee_types.update', module: 'fee_types' },
+  { key: 'fee_types.archive', module: 'fee_types' },
+  { key: 'school_fees.create', module: 'school_fees' },
+  { key: 'school_fees.read', module: 'school_fees' },
+  { key: 'school_fees.update', module: 'school_fees' },
+  { key: 'school_fees.archive', module: 'school_fees' },
+  { key: 'fee_assignments.read', module: 'fee_assignments' },
   // `reconcile` also governs editing one child's amountDue: both are the
   // authority to change what a specific student owes.
+  { key: 'fee_assignments.reconcile', module: 'fee_assignments' },
+  { key: 'fee_payments.create', module: 'fee_payments' },
+  { key: 'fee_payments.read', module: 'fee_payments' },
   // Separate from `create`: reversing a receipt a parent is holding is a
   // materially different act from recording a payment, and it is the one a
   // school will want to restrict.
+  { key: 'fee_payments.reverse', module: 'fee_payments' },
   // Separate from `fee_assignments.read`: the level billing summary and the
   // ledger expose the whole school's money, which is not the same authority
   // as looking up one child's bill.
+  { key: 'fees.report', module: 'fees' },
+  { key: 'invoices.create', module: 'invoices' },
+  { key: 'invoices.read', module: 'invoices' },
   // Withdrawing a numbered document a parent is holding. Correcting an
   // invoice needs BOTH this and `invoices.create` — there is deliberately no
   // third key for it.
+  { key: 'invoices.cancel', module: 'invoices' },
   // Phase 2 — SMS notification layer.
   // Separate from `read` because triggering is COST-BEARING: every fire is a
   // paid message. Seeing the log and spending the school's money are not the
@@ -149,6 +166,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'labels.read', 'attendance.read_any',
     // Read-only oversight of the school's money. No create, no payment,
     // no cancel.
+    'fee_types.read', 'school_fees.read', 'fee_assignments.read',
+    'fee_payments.read', 'fees.report', 'invoices.read',
   ],
   ACADEMIC_COORDINATOR: [
     'academic_years.read', 'terms.read', 'levels.create', 'levels.read', 'levels.update', 'levels.archive',
@@ -181,6 +200,12 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   PARENT_GUARDIAN: ['students.read', 'guardians.read', 'files.read', 'enrollments.read'],
   BURSAR: [
     // The whole finance surface…
+    'fee_types.create', 'fee_types.read', 'fee_types.update', 'fee_types.archive',
+    'school_fees.create', 'school_fees.read', 'school_fees.update', 'school_fees.archive',
+    'fee_assignments.read', 'fee_assignments.reconcile',
+    'fee_payments.create', 'fee_payments.read', 'fee_payments.reverse',
+    'fees.report',
+    'invoices.create', 'invoices.read', 'invoices.cancel',
     'labels.read',
     // Sends the fee reminders and sees whether they arrived.
     // …plus READ-ONLY on the records a bill has to name. A bursar can take

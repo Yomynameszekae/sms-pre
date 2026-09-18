@@ -172,6 +172,41 @@ enum AttendanceStatus {
   @@map("attendance_status")
 }
 
+/// Declared in market-weight order: mobile money dominates Ghanaian school fee
+/// collection, cash remains common at low-fee schools, bank transfer is
+/// secondary, card is marginal. Postgres enum ordering is declaration order,
+/// so `ORDER BY method` sorts by market weight for free.
+///
+/// The NETWORK is deliberately NOT in here. `momo_mtn | momo_telecel | …`
+/// would bake commercial brands into a type: Vodafone Cash became Telecel
+/// Cash and AirtelTigo Money is now AT Money, inside this project's own
+/// lifetime. `method` stays semantic; `FeePayment.providerCode` carries the
+/// network and is validated against a constant list, editable without a
+/// migration.
+enum FeePaymentMethod {
+  mobile_money
+  cash
+  bank_transfer
+  cheque
+  card
+
+  @@map("fee_payment_method")
+}
+
+/// Only the two states the SCHOOL drives, and they are acts with an actor and
+/// an audit entry. "Pending / partially paid / paid" describe the MONEY and
+/// are DERIVED on read from the covered assignments and their payments —
+/// never stored, never synced. A stored payment state is a denormalised
+/// counter over money, which is the same thing §4.7 refused for FeeAccount:
+/// a reversal turning a `paid` invoice back to `partially_paid` is exactly
+/// the sync nobody will remember to write.
+enum InvoiceStatus {
+  issued
+  cancelled
+
+  @@map("invoice_status")
+}
+
 // =========================
 // SCHOOL SETUP
 // =========================
@@ -214,6 +249,12 @@ model School {
   files             File[]
   labels            Label[]
   attendanceRecords AttendanceRecord[]
+  feeTypes          FeeType[]
+  schoolFees        SchoolFee[]
+  feeAssignments    FeeAssignment[]
+  feePayments       FeePayment[]
+  invoices          Invoice[]
+  invoiceLines      InvoiceLine[]
 
   @@index([isActive])
   @@map("schools")
@@ -284,6 +325,7 @@ model AcademicYear {
   terms       Term[]
   classrooms  Classroom[]
   enrollments Enrollment[]
+  schoolFees  SchoolFee[]
 
   @@unique([schoolId, label])
   @@index([schoolId])
@@ -312,6 +354,8 @@ model Term {
 
   school       School       @relation(fields: [schoolId], references: [id])
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  schoolFees   SchoolFee[]
+  invoices     Invoice[]
 
   @@unique([academicYearId, termNumber])
   @@index([schoolId])
@@ -339,6 +383,7 @@ model Level {
   school     School                 @relation(fields: [schoolId], references: [id])
   classrooms Classroom[]
   admissions AdmissionApplication[]
+  schoolFees SchoolFee[]
 
   @@unique([schoolId, name])
   @@unique([schoolId, orderIndex])
@@ -790,6 +835,8 @@ model Enrollment {
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
 
   attendanceRecords AttendanceRecord[]
+  feeAssignments    FeeAssignment[]
+  invoices          Invoice[]
 
   // NOTE — two unique constraints govern this table, and only one of them can
   // be expressed here.
@@ -939,6 +986,7 @@ model Label {
   updatedBy String?  @map("updated_by") @db.Uuid
 
   school   School    @relation(fields: [schoolId], references: [id])
+  feeTypes FeeType[]
 
   @@index([schoolId])
   @@index([schoolId, category])
@@ -1020,5 +1068,273 @@ model AttendanceRecord {
   @@index([enrollmentId])
   @@index([schoolId, attendanceDate])
   @@map("attendance_records")
+}
+
+// =========================
+// FEES AND BILLING
+// =========================
+
+/// MONEY TYPE CONVENTION, set here for the whole codebase.
+///
+/// All amounts are `Decimal @db.Decimal(12, 2)`. Two rules follow:
+///
+///  1. Amounts serialise to JSON as STRINGS, never as JavaScript numbers.
+///     Prisma returns `Prisma.Decimal` (decimal.js), whose `toJSON()` already
+///     yields a string — so this happens for free and must not be "fixed" by
+///     mapping to Number() anywhere.
+///  2. There is NO `currency` column. Brite is a Ghana-only product and one
+///     formatter renders GHS everywhere. That is the direct answer to the
+///     benchmarked product's defect D13, where currency rendered as "GHS" on
+///     some pages and "GH₵" on others.
+
+/// A named charge (Tuition, Uniform), optionally under a `Label` so a future
+/// profit-and-loss knows which section it belongs to. The Label link is the
+/// only thing Stage 1a's shared classification is consumed by today.
+model FeeType {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId String  @map("school_id") @db.Uuid
+  labelId  String? @map("label_id") @db.Uuid
+
+  name        String  @db.VarChar(120)
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  label      Label?      @relation(fields: [labelId], references: [id])
+  schoolFees SchoolFee[]
+
+  // NOTE — uniqueness is NOT declared here. Like `Label`, the only rule is the
+  // raw-SQL expression index `uq_fee_type_school_name_lower`
+  // (school_id, lower(name)), because Prisma has no syntax for lower(name).
+  //
+  // Case-insensitivity matters more here than it looks: "Tuition" and
+  // "tuition" as two fee types would split the ledger into two accounts for
+  // one thing, and the ledger groups by fee type. A plain case-sensitive
+  // unique would let that through.
+  @@index([schoolId])
+  @@index([labelId])
+  @@map("fee_types")
+}
+
+/// A priced fee for one LEVEL, year and term.
+///
+/// It binds to `Level`, never to `Classroom`: a fee is priced for Basic 3 and
+/// every child in Basic 3A and Basic 3B pays it. The benchmarked product could
+/// bind fee and enrolment to the same entity because its "level" was both;
+/// Brite's are two, so assignment walks
+/// `Level → Classroom(levelId, academicYearId) → Enrollment(active)`.
+model SchoolFee {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId       String @map("school_id") @db.Uuid
+  feeTypeId      String @map("fee_type_id") @db.Uuid
+  levelId        String @map("level_id") @db.Uuid
+  academicYearId String @map("academic_year_id") @db.Uuid
+  termId         String @map("term_id") @db.Uuid
+
+  name     String  @db.VarChar(150)
+  amount   Decimal @map("amount") @db.Decimal(12, 2)
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school       School          @relation(fields: [schoolId], references: [id])
+  feeType      FeeType         @relation(fields: [feeTypeId], references: [id])
+  level        Level           @relation(fields: [levelId], references: [id])
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id])
+  term         Term            @relation(fields: [termId], references: [id])
+  assignments  FeeAssignment[]
+
+  @@unique([schoolId, feeTypeId, levelId, academicYearId, termId])
+  @@index([schoolId])
+  @@index([schoolId, academicYearId, termId])
+  @@index([levelId])
+  @@map("school_fees")
+}
+
+/// One child, one fee. The authoritative statement of what THIS child was
+/// billed.
+///
+/// `amountDue` is COPIED from `SchoolFee.amount` at assignment time, not read
+/// through. If a school corrects a fee from GH¢400 to GH¢450 in week three,
+/// every bill already handed to a parent must not silently change and every
+/// receipt already issued must still reconcile. Editing `SchoolFee.amount`
+/// therefore affects only FUTURE assignments.
+///
+/// `amountDue` is editable by an explicit action — EXCEPT while this
+/// assignment sits on a live (non-cancelled) invoice, which locks it. That
+/// freeze is what makes an issued invoice a stable document without copying
+/// any money onto it; see InvoicesService and FeeAssignmentsService.
+model FeeAssignment {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId     String @map("school_id") @db.Uuid
+  schoolFeeId  String @map("school_fee_id") @db.Uuid
+  enrollmentId String @map("enrollment_id") @db.Uuid
+
+  amountDue Decimal @map("amount_due") @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school       School        @relation(fields: [schoolId], references: [id])
+  schoolFee    SchoolFee     @relation(fields: [schoolFeeId], references: [id])
+  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id])
+  payments     FeePayment[]
+  invoiceLines InvoiceLine[]
+
+  // Makes assignment (and the reconcile action) idempotent by construction.
+  @@unique([schoolFeeId, enrollmentId])
+  @@index([schoolId])
+  @@index([enrollmentId])
+  @@map("fee_assignments")
+}
+
+/// Append-only. A correction is a REVERSING ENTRY — a new row with
+/// `reversesPaymentId` set and a NEGATIVE amount — never an edit and never a
+/// delete. The ledger then stays one clean sum with no exclusion subquery,
+/// and it matches the house answer for finance across the whole product.
+///
+/// A reversal does not consume a receipt number: `receiptNumber` is null on
+/// reversal rows, which is why the column is nullable and why the unique on
+/// it is safe (Postgres unique indexes ignore nulls).
+model FeePayment {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId        String @map("school_id") @db.Uuid
+  feeAssignmentId String @map("fee_assignment_id") @db.Uuid
+
+  receiptNumber String? @map("receipt_number") @db.VarChar(50)
+  amount        Decimal @db.Decimal(12, 2)
+
+  method       FeePaymentMethod
+  providerCode String?          @map("provider_code") @db.VarChar(30)
+  reference    String?          @db.VarChar(100)
+  paidOn       DateTime         @map("paid_on") @db.Date
+  notes        String?
+
+  reversesPaymentId String? @map("reverses_payment_id") @db.Uuid
+  reversalReason    String? @map("reversal_reason") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school        School        @relation(fields: [schoolId], references: [id])
+  feeAssignment FeeAssignment @relation(fields: [feeAssignmentId], references: [id])
+
+  reverses   FeePayment?  @relation("PaymentReversal", fields: [reversesPaymentId], references: [id])
+  reversedBy FeePayment[] @relation("PaymentReversal")
+
+  @@unique([schoolId, receiptNumber])
+  @@index([schoolId])
+  @@index([feeAssignmentId])
+  @@index([schoolId, paidOn])
+  @@map("fee_payments")
+}
+
+// =========================
+// INVOICES
+// =========================
+
+/// A formal billing document over a FROZEN SET of FeeAssignment rows.
+///
+/// It stores NO MONEY. There is deliberately no `total`, no `amountPaid` and
+/// no `balance` column — every figure is computed on read through
+/// `lines → FeeAssignment → FeePayment`. What an invoice adds that a frozen
+/// assignment does not already have is the frozen SET: "this term's bill" as
+/// a query has no memory, so a later reconcile silently changes what
+/// yesterday's bill said. Enumerated lines cannot change underneath a number.
+///
+/// SUPERSESSION. A correction is cancel-and-reissue in one transaction, with
+/// the new invoice pointing back at the old through `supersedesInvoiceId`.
+/// There is only ONE column for this, not two: the forward pointer
+/// ("what replaced me") is the Prisma back-relation `supersededBy`, so the
+/// chain is walkable in both directions with no second column that could
+/// disagree with the first. The API exposes both directions as fields.
+/// `@unique` on the FK is what keeps a chain linear — an invoice can be
+/// superseded at most once.
+model Invoice {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId String @map("school_id") @db.Uuid
+
+  invoiceNumber String @map("invoice_number") @db.VarChar(50)
+
+  /// Anchored on enrollment, matching FeeAssignment, so an invoice can never
+  /// span two academic years. studentId and academicYearId are reachable
+  /// through it and are not duplicated here.
+  enrollmentId String @map("enrollment_id") @db.Uuid
+  termId       String @map("term_id") @db.Uuid
+
+  status   InvoiceStatus @default(issued)
+  issuedOn DateTime      @map("issued_on") @db.Date
+  dueOn    DateTime?     @map("due_on") @db.Date
+  notes    String?
+
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy        String?   @map("cancelled_by") @db.Uuid
+  cancellationReason String?   @map("cancellation_reason") @db.VarChar(500)
+
+  supersedesInvoiceId String? @unique @map("supersedes_invoice_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+
+  school     School        @relation(fields: [schoolId], references: [id])
+  enrollment Enrollment    @relation(fields: [enrollmentId], references: [id])
+  term       Term          @relation(fields: [termId], references: [id])
+  lines      InvoiceLine[]
+
+  supersedes   Invoice? @relation("InvoiceSupersession", fields: [supersedesInvoiceId], references: [id])
+  supersededBy Invoice? @relation("InvoiceSupersession")
+
+  @@unique([schoolId, invoiceNumber])
+  @@index([schoolId])
+  @@index([enrollmentId])
+  @@index([schoolId, termId])
+  @@index([status])
+  @@map("invoices")
+}
+
+/// One covered assignment. Carries no amount and no description — the line IS
+/// the reference, and every figure is read through it.
+///
+/// `voidedAt` mirrors `Invoice.status = cancelled` and is written in the SAME
+/// transaction as the cancel. It exists ONLY so that "an assignment sits on at
+/// most one LIVE invoice" can be a database constraint: a partial index
+/// predicate cannot reach into the parent table, so the flag has to be here.
+/// It is a lifecycle flag with exactly one writer, never money. The index is
+/// `uq_one_live_invoice_line_per_assignment` in
+/// starter-docs/phase_2_required_raw_sql_migrations.sql.
+model InvoiceLine {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schoolId  String @map("school_id") @db.Uuid
+  invoiceId String @map("invoice_id") @db.Uuid
+
+  feeAssignmentId String @map("fee_assignment_id") @db.Uuid
+
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  school        School        @relation(fields: [schoolId], references: [id])
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeAssignment FeeAssignment @relation(fields: [feeAssignmentId], references: [id])
+
+  @@unique([invoiceId, feeAssignmentId])
+  @@index([schoolId])
+  @@index([feeAssignmentId])
+  @@map("invoice_lines")
 }
 
