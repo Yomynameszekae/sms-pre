@@ -1,0 +1,31 @@
+{
+  // KEPT IN SYNC MANUALLY with ../.vscode/settings.json at the sms-main level.
+  // THAT file is the active one when the whole project is opened together
+  // (sms-main as the workspace root); THIS copy only applies if sms-pre is
+  // opened standalone. If the tsdk path or the version pin changes, update BOTH.
+  //
+  // Use each project's own TypeScript from node_modules, not the one bundled
+  // with the editor.
+  //
+  // Path is relative to this workspace root (sms-pre), which applies only when
+  // sms-pre is opened directly rather than through the sms-main folder.
+  //
+  // Without this the editor typechecks with whatever version it ships, which
+  // drifts ahead of the projects. That produced three phantom errors in
+  // src/main.ts that `npx tsc -p tsconfig.json` does not report — and
+  // acting on one of them (switching `import * as compression` to a default
+  // import) would have emitted `compression_1.default(...)`, which is
+  // undefined at runtime because the package has no default export. The
+  // server would have failed to boot.
+  //
+  // NOTE: typescript.tsdk is window-scoped, so ONE version serves the whole
+  // window. sms-pre and sms-web are separate projects with separate
+  // node_modules, and both are currently on TypeScript 5.9.3, so pinning to
+  // either covers both. If their TypeScript versions ever diverge, whichever
+  // is not pinned here will start showing editor-only errors again.
+  //
+  // After changing this, run "TypeScript: Restart TS Server" from the command
+  // palette, or reload the window.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
