@@ -139,4 +139,102 @@ describe('StaffService', () => {
       );
     });
   });
+
+  // ── search ────────────────────────────────────────────────────────────────
+  //
+  // A staff name spans two columns, so the query a user is most likely to
+  // type — the whole name — is the one no single `contains` can match.
+  describe('findAll — search', () => {
+    /** The `where` handed to Prisma. */
+    const whereUsed = () => (mockPrisma.staff.findMany as jest.Mock).mock.calls[0][0].where;
+
+    /** Does this `where` select the given person? Mirrors Prisma's semantics. */
+    function matches(
+      where: any,
+      p: { firstName: string; lastName: string; staffNumber: string },
+    ): boolean {
+      const clause = (c: any): boolean => {
+        if (c.OR) return c.OR.some(clause);
+        if (c.AND) return c.AND.every(clause);
+        for (const field of ['firstName', 'lastName', 'staffNumber'] as const) {
+          if (c[field]?.contains !== undefined) {
+            return p[field].toLowerCase().includes(String(c[field].contains).toLowerCase());
+          }
+        }
+        return true;
+      };
+      return where.OR ? where.OR.some(clause) : true;
+    }
+
+    const YAW = { firstName: 'Yaw', lastName: 'Darko', staffNumber: 'STF-0003' };
+    // Shares a first name with one person and a last name with another, so a
+    // careless OR would match all three on a full-name query.
+    const YAW_MENSAH = { firstName: 'Yaw', lastName: 'Mensah', staffNumber: 'STF-0010' };
+    const KOFI_DARKO = { firstName: 'Kofi', lastName: 'Darko', staffNumber: 'STF-0011' };
+
+    beforeEach(() => {
+      (mockPrisma.staff.findMany as jest.Mock).mockResolvedValue([]);
+      (mockPrisma.staff.count as jest.Mock).mockResolvedValue(0);
+    });
+
+    it('matches a single first name, as it always did', async () => {
+      await service.findAll('school-a', { search: 'Yaw' } as any);
+      const where = whereUsed();
+      expect(matches(where, YAW)).toBe(true);
+      expect(matches(where, KOFI_DARKO)).toBe(false);
+    });
+
+    it('matches a single last name, as it always did', async () => {
+      await service.findAll('school-a', { search: 'Darko' } as any);
+      const where = whereUsed();
+      expect(matches(where, YAW)).toBe(true);
+      expect(matches(where, KOFI_DARKO)).toBe(true);
+      expect(matches(where, YAW_MENSAH)).toBe(false);
+    });
+
+    it('still matches the staff number', async () => {
+      await service.findAll('school-a', { search: 'STF-0003' } as any);
+      const where = whereUsed();
+      expect(matches(where, YAW)).toBe(true);
+      expect(matches(where, KOFI_DARKO)).toBe(false);
+    });
+
+    it('matches a FULL name, which previously returned nothing', async () => {
+      await service.findAll('school-a', { search: 'Yaw Darko' } as any);
+      expect(matches(whereUsed(), YAW)).toBe(true);
+    });
+
+    it('does NOT cross-match two different people who share half a name', async () => {
+      // Yaw Mensah and Kofi Darko between them contain both words, but neither
+      // is Yaw Darko.
+      await service.findAll('school-a', { search: 'Yaw Darko' } as any);
+      const where = whereUsed();
+      expect(matches(where, YAW_MENSAH)).toBe(false);
+      expect(matches(where, KOFI_DARKO)).toBe(false);
+    });
+
+    it('matches a full name written the other way round', async () => {
+      await service.findAll('school-a', { search: 'Darko Yaw' } as any);
+      expect(matches(whereUsed(), YAW)).toBe(true);
+    });
+
+    it('is case-insensitive for a full name', async () => {
+      await service.findAll('school-a', { search: 'yAw dArKo' } as any);
+      expect(matches(whereUsed(), YAW)).toBe(true);
+    });
+
+    it('does not pair a name with an unrelated staff number', async () => {
+      // The token clause omits staffNumber on purpose: "Yaw STF-0011" must not
+      // match Yaw Darko by taking the name from one field and the number from
+      // a different person's row.
+      await service.findAll('school-a', { search: 'Yaw STF-0011' } as any);
+      expect(matches(whereUsed(), YAW)).toBe(false);
+    });
+
+    it('applies no filter for a blank search', async () => {
+      await service.findAll('school-a', { search: '   ' } as any);
+      expect(whereUsed().OR).toBeUndefined();
+    });
+  });
+
 });

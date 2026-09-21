@@ -121,12 +121,35 @@ export class StaffService {
     const { skip, take } = getPaginationParams(query.page, query.limit);
 
     const where: any = { schoolId };
-    if (query.search) {
+    if (query.search?.trim()) {
+      const term = query.search.trim();
+      // Each field on its own, which is what a single word or a staff number
+      // wants.
       where.OR = [
-        { firstName: { contains: query.search, mode: 'insensitive' } },
-        { lastName: { contains: query.search, mode: 'insensitive' } },
-        { staffNumber: { contains: query.search, mode: 'insensitive' } },
+        { firstName: { contains: term, mode: 'insensitive' } },
+        { lastName: { contains: term, mode: 'insensitive' } },
+        { staffNumber: { contains: term, mode: 'insensitive' } },
       ];
+
+      // A FULL NAME spans two columns, so no single `contains` can match it:
+      // "Yaw Darko" is a substring of neither "Yaw" nor "Darko", and typing
+      // somebody's whole name found nobody. Every word must match some NAME
+      // field, which covers "Yaw Darko" and "Darko Yaw" alike.
+      //
+      // staffNumber is deliberately absent from this clause. Including it
+      // would make "Yaw STF-0003" match, pairing a name with an unrelated
+      // number — a result nobody typing that could have wanted.
+      const words = term.split(/\s+/).filter(Boolean);
+      if (words.length > 1) {
+        where.OR.push({
+          AND: words.map((word) => ({
+            OR: [
+              { firstName: { contains: word, mode: 'insensitive' } },
+              { lastName: { contains: word, mode: 'insensitive' } },
+            ],
+          })),
+        });
+      }
     }
     if (query.status) where.status = query.status;
     if (query.roleCategory) where.roleCategory = query.roleCategory;
