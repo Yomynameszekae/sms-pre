@@ -18,6 +18,7 @@
     "backfill:admission-numbers": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/backfill-admission-numbers.ts",
     "permissions:check": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/sync-permissions.ts",
     "permissions:sync": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/sync-permissions.ts --apply",
+    "staff:login-check": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/check-staff-login.ts",
     "prisma:studio": "npx prisma studio",
     "db:raw-sql": "node scripts/apply-raw-migration.js",
     "db:setup": "npm run prisma:migrate && npm run db:raw-sql && npm run prisma:generate && npm run prisma:seed",
