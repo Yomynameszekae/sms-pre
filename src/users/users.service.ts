@@ -4,7 +4,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { hashPassword } from '../common/utils/hash.util';
 import { isUniqueViolationOn } from '../common/utils/document-number.util';
 import { getPaginationParams, paginate } from '../common/utils/pagination.util';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserDto, LinkedEntityType } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
 
@@ -76,6 +76,24 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, actorUserId: string, schoolId: string, requestId?: string) {
+    // The staff link is a POLYMORPHIC SOFT REFERENCE — linked_entity_type plus
+    // linked_entity_id, with no foreign key, so the database will happily
+    // store an id that matches no row. Nothing then reports the account as
+    // broken: it signs in, and only the screens that resolve the staff member
+    // behave oddly. Check it here, where the id first arrives, because there
+    // is no constraint further down that will.
+    if (dto.linkedEntityType === LinkedEntityType.STAFF) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: dto.linkedEntityId, schoolId },
+        select: { id: true },
+      });
+      if (!staff) {
+        throw new NotFoundException(
+          'No staff member with that id exists in this school, so a login cannot be linked to them.',
+        );
+      }
+    }
+
     const passwordHash = await hashPassword(dto.password);
 
     let user: UserSummary;

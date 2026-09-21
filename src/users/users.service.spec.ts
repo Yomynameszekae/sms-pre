@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { UsersService } from './users.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,6 +30,7 @@ function uniqueViolation(target: string[]) {
 
 const mockPrisma: any = {
   user: { create: jest.fn(), update: jest.fn(), findFirst: jest.fn() },
+  staff: { findFirst: jest.fn() },
 };
 const mockAuditLogs = { create: jest.fn() };
 
@@ -51,7 +52,12 @@ const dto = {
   linkedEntityId: 'staff-1',
 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  // The staff row exists unless a test says otherwise — create() now checks it
+  // before writing the link.
+  mockPrisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+});
 
 describe('UsersService.create — unique violations become 409, not 500', () => {
   it('names the linked entity when that staff member already has an account', async () => {
@@ -162,5 +168,52 @@ describe('UsersService.update — the same exposure, since email and phone are e
     await expect(
       svc.update('u1', { email: 'x@example.com' }, 'actor', 's1'),
     ).rejects.toBe(boom);
+  });
+});
+
+describe('UsersService.create — the staff link is verified before it is written', () => {
+  it('404s when no staff member has that id, instead of writing a dangling link', async () => {
+    // linked_entity_id has NO foreign key: the database would store an id that
+    // matches nothing, and the account would look fine until something tried
+    // to resolve the staff member behind it.
+    const svc = await makeService();
+    mockPrisma.staff.findFirst.mockResolvedValue(null);
+
+    await expect(svc.create(dto, 'actor', 's1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.create(dto, 'actor', 's1')).rejects.toThrow(
+      /No staff member with that id exists in this school/,
+    );
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('scopes the lookup to the caller school, so another school\'s staff id is refused', async () => {
+    const svc = await makeService();
+    mockPrisma.staff.findFirst.mockResolvedValue(null);
+
+    await expect(svc.create(dto, 'actor', 'school-A')).rejects.toBeInstanceOf(NotFoundException);
+    expect(mockPrisma.staff.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'staff-1', schoolId: 'school-A' } }),
+    );
+  });
+
+  it('proceeds to create the user when the staff member is real', async () => {
+    const svc = await makeService();
+    mockPrisma.user.create.mockResolvedValue({ id: 'u1', schoolId: 's1' });
+
+    await svc.create(dto, 'actor', 's1');
+
+    expect(mockPrisma.staff.findFirst).toHaveBeenCalled();
+    expect(mockPrisma.user.create).toHaveBeenCalled();
+  });
+
+  it('does not look up staff for a guardian link', async () => {
+    // Guardians carry the same soft reference and are NOT validated here; that
+    // is a deliberate scope boundary, not an oversight. See the report note.
+    const svc = await makeService();
+    mockPrisma.user.create.mockResolvedValue({ id: 'u1', schoolId: 's1' });
+
+    await svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 's1');
+
+    expect(mockPrisma.staff.findFirst).not.toHaveBeenCalled();
   });
 });
