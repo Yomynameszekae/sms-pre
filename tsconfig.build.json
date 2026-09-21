@@ -1,4 +1,27 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/seed.ts"]
+  "compilerOptions": {
+    // Pin the root so the emitted tree is dist/main.js, not dist/src/main.js.
+    //
+    // Without this, tsc INFERS rootDir as the common ancestor of every input
+    // file. The moment a compiled .ts file appeared outside src/ (prisma/ and
+    // scripts/ are siblings of it) that ancestor became the project root, and
+    // the whole output silently shifted one directory deeper — breaking
+    // `npm start`, the Dockerfile CMD, the systemd unit and the pm2 command,
+    // all of which target dist/main.js.
+    "rootDir": "src",
+    // Keep the incremental-build cache inside dist/, which is gitignored.
+    // Setting rootDir moves tsc's default location for it to the project
+    // root, where it would show up as an untracked stray file.
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
+  // prisma/ and scripts/ are excluded because rootDir above forbids inputs
+  // outside src/, and because nothing ever ran their compiled output: the
+  // seed, demo-seed and backfill scripts are all invoked through ts-node on
+  // the TypeScript source, and apply-raw-migration.js is plain JS. Compiling
+  // them into dist/ produced files nothing loaded.
+  //
+  // They are still type-checked — `npx tsc --noEmit -p tsconfig.json` covers
+  // the whole project, and that is what CI should run.
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma", "scripts"]
 }
