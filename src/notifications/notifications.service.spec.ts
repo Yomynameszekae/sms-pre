@@ -437,3 +437,98 @@ describe('the consent gate cannot be bypassed', () => {
     expect(createAt).toBeGreaterThan(bailAt);
   });
 });
+
+// ── a refusal must still say WHO it was refused for ─────────────────────────
+//
+// Resolution can fail after the guardian has been identified — "has not given
+// SMS consent" names a specific person. Dropping them leaves a row saying a
+// message was refused without saying for whom, which makes the notification
+// log unable to answer the one question it exists for: why did THIS parent
+// not get their message.
+//
+// The row is addressed by studentId for fee and attendance triggers, so
+// guardian_id is the ONLY place the guardian appears. Nothing recovers it
+// later.
+describe('a suppressed row records the guardian it was suppressed for', () => {
+  it('consent withheld, reached through a student', async () => {
+    const svc = await makeService();
+    mockPrisma.studentGuardian.findFirst.mockResolvedValue({
+      guardianId: 'g1', canReceiveSms: true,
+      guardian: { ...GUARDIAN, smsConsentGiven: false },
+    });
+
+    await svc.enqueue(request({ studentId: 'stu1' }));
+
+    const [row] = written();
+    expect(row.status).toBe(NotificationStatus.suppressed);
+    expect(row.lastError).toBe('Guardian has not given SMS consent');
+    expect(row.guardianId).toBe('g1');
+    expect(row.studentId).toBe('stu1');
+  });
+
+  it('the per-student link is switched off', async () => {
+    const svc = await makeService();
+    mockPrisma.studentGuardian.findFirst.mockResolvedValue({
+      guardianId: 'g1', canReceiveSms: false, guardian: GUARDIAN,
+    });
+
+    await svc.enqueue(request({ studentId: 'stu1' }));
+
+    const [row] = written();
+    expect(row.lastError).toBe('Guardian is not set to receive SMS for this student');
+    expect(row.guardianId).toBe('g1');
+  });
+
+  it('the guardian record is archived', async () => {
+    const svc = await makeService();
+    mockPrisma.studentGuardian.findFirst.mockResolvedValue({
+      guardianId: 'g1', canReceiveSms: true,
+      guardian: { ...GUARDIAN, archivedAt: new Date() },
+    });
+
+    await svc.enqueue(request({ studentId: 'stu1' }));
+
+    const [row] = written();
+    expect(row.lastError).toBe('Guardian record is archived');
+    expect(row.guardianId).toBe('g1');
+  });
+
+  it('consent withheld, addressed to the guardian directly', async () => {
+    const svc = await makeService();
+    mockPrisma.guardian.findFirst.mockResolvedValue({ ...GUARDIAN, smsConsentGiven: false });
+
+    await svc.enqueue(request({ guardianId: 'g1' }));
+
+    const [row] = written();
+    expect(row.guardianId).toBe('g1');
+  });
+
+  it("consent withheld, reached through a guardian's own login", async () => {
+    const svc = await makeService();
+    mockPrisma.user.findFirst.mockResolvedValue({
+      id: 'u1', phone: '0244000000', isActive: true,
+      linkedEntityType: 'guardian', linkedEntityId: 'g1',
+    });
+    mockPrisma.guardian.findFirst.mockResolvedValue({ ...GUARDIAN, smsConsentGiven: false });
+
+    await svc.enqueue(request({ userId: 'u1', trigger: NotificationTrigger.password_reset }));
+
+    const [row] = written();
+    expect(row.guardianId).toBe('g1');
+    expect(row.userId).toBe('u1');
+  });
+
+  it('but NOT when there was no guardian to identify', async () => {
+    // "Student has no primary guardian" names nobody, so guardian_id stays
+    // null. Inventing one here would be worse than leaving it empty.
+    const svc = await makeService();
+    mockPrisma.studentGuardian.findFirst.mockResolvedValue(null);
+
+    await svc.enqueue(request({ studentId: 'stu1' }));
+
+    const [row] = written();
+    expect(row.lastError).toBe('Student has no primary guardian');
+    expect(row.guardianId).toBeNull();
+    expect(row.studentId).toBe('stu1');
+  });
+});

@@ -51,6 +51,21 @@ interface ResolvedRecipient {
   guardianName: string;
 }
 
+/**
+ * A refusal, plus whatever identity was established before the refusal.
+ *
+ * Resolution can fail AFTER the guardian has been found — "has not given SMS
+ * consent" names a specific person the code is holding at that moment. Losing
+ * them means the suppressed row says a message was refused without saying who
+ * it was refused for, which makes the log unable to answer the only question
+ * anyone opens it to ask: why did THIS parent not get their message.
+ */
+interface SuppressedOutcome {
+  suppressed: string;
+  /** Set whenever the guardian was identified before the refusal. */
+  partial?: { guardianId: string };
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -88,7 +103,7 @@ export class NotificationsService {
    */
   private async resolveRecipient(
     request: EnqueueRequest,
-  ): Promise<ResolvedRecipient | { suppressed: string }> {
+  ): Promise<ResolvedRecipient | SuppressedOutcome> {
     const { schoolId } = request;
 
     // ── a login (password reset, account setup) ──
@@ -108,7 +123,10 @@ export class NotificationsService {
         });
         if (!guardian) return { suppressed: 'Linked guardian not found' };
         if (!guardian.smsConsentGiven) {
-          return { suppressed: 'Guardian has not given SMS consent' };
+          return {
+            suppressed: 'Guardian has not given SMS consent',
+            partial: { guardianId: guardian.id },
+          };
         }
         return {
           guardianId: guardian.id,
@@ -141,12 +159,23 @@ export class NotificationsService {
       });
       if (!link) return { suppressed: 'Student has no primary guardian' };
       if (!link.guardian.smsConsentGiven) {
-        return { suppressed: 'Guardian has not given SMS consent' };
+        return {
+          suppressed: 'Guardian has not given SMS consent',
+          partial: { guardianId: link.guardianId },
+        };
       }
       if (!link.canReceiveSms) {
-        return { suppressed: 'Guardian is not set to receive SMS for this student' };
+        return {
+          suppressed: 'Guardian is not set to receive SMS for this student',
+          partial: { guardianId: link.guardianId },
+        };
       }
-      if (link.guardian.archivedAt) return { suppressed: 'Guardian record is archived' };
+      if (link.guardian.archivedAt) {
+        return {
+          suppressed: 'Guardian record is archived',
+          partial: { guardianId: link.guardianId },
+        };
+      }
       return {
         guardianId: link.guardianId,
         studentId: request.studentId,
@@ -163,9 +192,17 @@ export class NotificationsService {
       });
       if (!guardian) return { suppressed: 'Guardian not found' };
       if (!guardian.smsConsentGiven) {
-        return { suppressed: 'Guardian has not given SMS consent' };
+        return {
+          suppressed: 'Guardian has not given SMS consent',
+          partial: { guardianId: guardian.id },
+        };
       }
-      if (guardian.archivedAt) return { suppressed: 'Guardian record is archived' };
+      if (guardian.archivedAt) {
+        return {
+          suppressed: 'Guardian record is archived',
+          partial: { guardianId: guardian.id },
+        };
+      }
       return {
         guardianId: guardian.id,
         studentId: null,
@@ -207,7 +244,9 @@ export class NotificationsService {
 
     // A refusal is RECORDED, with the reason, so the school can see and fix it.
     if ('suppressed' in resolved) {
-      return this.writeSuppressed(request, body, segments, resolved.suppressed);
+      // Carry through whoever was identified before the refusal, so the row
+      // names the guardian the message was refused FOR.
+      return this.writeSuppressed(request, body, segments, resolved.suppressed, resolved.partial);
     }
 
     const phone = normaliseGhanaPhone(resolved.phoneRaw);
@@ -257,7 +296,11 @@ export class NotificationsService {
     body: string,
     segments: number,
     reason: string,
-    resolved?: ResolvedRecipient,
+    // Structural, so both a full ResolvedRecipient (the unusable-number path)
+    // and a partial identity from a failed resolution satisfy it. The body
+    // below is unchanged — it already prefers the resolved id over the
+    // request's.
+    resolved?: { guardianId?: string | null; studentId?: string | null; userId?: string | null },
   ): Promise<EnqueueOutcome> {
     try {
       const row = await this.prisma.notificationMessage.create({
