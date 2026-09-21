@@ -1,6 +1,6 @@
 # Roles, Permissions and User Accounts — Admin Guide
 
-*Working doc, started 2026-09-21. Captures how access control actually works in Brite SMS, confirmed against the real code and (where noted) the deployed database — not guessed. A copy of this also lives in the codebase (see note at bottom).*
+*Working doc, started 2026-09-21. Captures how access control actually works in Brite SMS, confirmed against the real code and (where noted) the deployed database — not guessed. The canonical copy lives in the codebase; see the note at the bottom.*
 
 ## The short version
 
