@@ -31,6 +31,7 @@ function uniqueViolation(target: string[]) {
 const mockPrisma: any = {
   user: { create: jest.fn(), update: jest.fn(), findFirst: jest.fn() },
   staff: { findFirst: jest.fn() },
+  guardian: { findFirst: jest.fn() },
 };
 const mockAuditLogs = { create: jest.fn() };
 
@@ -57,6 +58,7 @@ beforeEach(() => {
   // The staff row exists unless a test says otherwise — create() now checks it
   // before writing the link.
   mockPrisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+  mockPrisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
 });
 
 describe('UsersService.create — unique violations become 409, not 500', () => {
@@ -206,14 +208,48 @@ describe('UsersService.create — the staff link is verified before it is writte
     expect(mockPrisma.user.create).toHaveBeenCalled();
   });
 
-  it('does not look up staff for a guardian link', async () => {
-    // Guardians carry the same soft reference and are NOT validated here; that
-    // is a deliberate scope boundary, not an oversight. See the report note.
+  it('checks the guardian table, not the staff table, for a guardian link', async () => {
     const svc = await makeService();
     mockPrisma.user.create.mockResolvedValue({ id: 'u1', schoolId: 's1' });
 
     await svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 's1');
 
+    expect(mockPrisma.guardian.findFirst).toHaveBeenCalled();
     expect(mockPrisma.staff.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('404s when no guardian has that id, instead of writing a dangling link', async () => {
+    const svc = await makeService();
+    mockPrisma.guardian.findFirst.mockResolvedValue(null);
+
+    await expect(
+      svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 's1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 's1'),
+    ).rejects.toThrow(/No guardian with that id exists in this school/);
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('scopes the guardian lookup to the caller school', async () => {
+    const svc = await makeService();
+    mockPrisma.guardian.findFirst.mockResolvedValue(null);
+
+    await expect(
+      svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 'school-B'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(mockPrisma.guardian.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'staff-1', schoolId: 'school-B' } }),
+    );
+  });
+
+  it('proceeds to create the user when the guardian is real', async () => {
+    const svc = await makeService();
+    mockPrisma.user.create.mockResolvedValue({ id: 'u1', schoolId: 's1' });
+
+    await svc.create({ ...dto, linkedEntityType: 'guardian' as any }, 'actor', 's1');
+
+    expect(mockPrisma.guardian.findFirst).toHaveBeenCalled();
+    expect(mockPrisma.user.create).toHaveBeenCalled();
   });
 });

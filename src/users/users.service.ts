@@ -76,12 +76,15 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto, actorUserId: string, schoolId: string, requestId?: string) {
-    // The staff link is a POLYMORPHIC SOFT REFERENCE — linked_entity_type plus
-    // linked_entity_id, with no foreign key, so the database will happily
+    // The linked entity is a POLYMORPHIC SOFT REFERENCE — linked_entity_type
+    // plus linked_entity_id, with no foreign key, so the database will happily
     // store an id that matches no row. Nothing then reports the account as
-    // broken: it signs in, and only the screens that resolve the staff member
-    // behave oddly. Check it here, where the id first arrives, because there
+    // broken: it signs in, and only the screens that resolve the person behind
+    // it behave oddly. Check it here, where the id first arrives, because there
     // is no constraint further down that will.
+    //
+    // BOTH types are checked. Guardians carry the identical reference and were
+    // briefly left out; the asymmetry was arbitrary, not principled.
     if (dto.linkedEntityType === LinkedEntityType.STAFF) {
       const staff = await this.prisma.staff.findFirst({
         where: { id: dto.linkedEntityId, schoolId },
@@ -90,6 +93,16 @@ export class UsersService {
       if (!staff) {
         throw new NotFoundException(
           'No staff member with that id exists in this school, so a login cannot be linked to them.',
+        );
+      }
+    } else if (dto.linkedEntityType === LinkedEntityType.GUARDIAN) {
+      const guardian = await this.prisma.guardian.findFirst({
+        where: { id: dto.linkedEntityId, schoolId },
+        select: { id: true },
+      });
+      if (!guardian) {
+        throw new NotFoundException(
+          'No guardian with that id exists in this school, so a login cannot be linked to them.',
         );
       }
     }
