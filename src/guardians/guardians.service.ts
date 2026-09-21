@@ -213,11 +213,31 @@ export class GuardiansService {
     const { skip, take } = getPaginationParams(query.page, query.limit);
 
     const where: any = { schoolId, ...(query.includeArchived ? {} : { archivedAt: null }) };
-    if (query.search) {
+    if (query.search?.trim()) {
+      const term = query.search.trim();
+      // Each field on its own, which is what a single word wants.
       where.OR = [
-        { firstName: { contains: query.search, mode: 'insensitive' } },
-        { lastName: { contains: query.search, mode: 'insensitive' } },
+        { firstName: { contains: term, mode: 'insensitive' } },
+        { lastName: { contains: term, mode: 'insensitive' } },
       ];
+
+      // A FULL NAME spans two columns, so no single `contains` can match it:
+      // "Samuel Boakye" is not a substring of either "Samuel" or "Boakye", and
+      // typing somebody's whole name returned nothing at all. Every word must
+      // match some name field, which covers "Samuel Boakye" and "Boakye
+      // Samuel" alike — people write names in both orders, and matching a
+      // concatenation would only have handled one of them.
+      const words = term.split(/\s+/).filter(Boolean);
+      if (words.length > 1) {
+        where.OR.push({
+          AND: words.map((word) => ({
+            OR: [
+              { firstName: { contains: word, mode: 'insensitive' } },
+              { lastName: { contains: word, mode: 'insensitive' } },
+            ],
+          })),
+        });
+      }
     }
 
     const [items, total] = await this.prisma.$transaction([
