@@ -111,14 +111,40 @@ export class StudentsService {
 
     const where: any = { schoolId };
     if (query.status) where.status = query.status;
-    if (query.search) {
+    if (query.search?.trim()) {
+      const term = query.search.trim();
       // The UI offers "Search students by name or number…", so studentNumber
       // is matched on the same terms as the names: partial, case-insensitive.
       where.OR = [
-        { firstName: { contains: query.search, mode: 'insensitive' } },
-        { lastName: { contains: query.search, mode: 'insensitive' } },
-        { studentNumber: { contains: query.search, mode: 'insensitive' } },
+        { firstName: { contains: term, mode: 'insensitive' } },
+        { lastName: { contains: term, mode: 'insensitive' } },
+        { studentNumber: { contains: term, mode: 'insensitive' } },
       ];
+
+      // A FULL NAME spans several columns, so no single `contains` can match
+      // it: "Ama Boakye" is a substring of neither "Ama" nor "Boakye", and
+      // typing a child's whole name found nobody. Every word must match some
+      // NAME field, which covers "Ama Boakye" and "Boakye Ama" alike.
+      //
+      // middleName is included, so "Ama Serwaa Boakye" — how a register or a
+      // parent usually writes it — resolves. preferredName is deliberately
+      // NOT: it holds a nickname, and matching on it would return children
+      // whose formal name looks nothing like what was typed.
+      //
+      // studentNumber is absent here too. Including it would make
+      // "Ama STU-0002" match, pairing a name with another child's number.
+      const words = term.split(/\s+/).filter(Boolean);
+      if (words.length > 1) {
+        where.OR.push({
+          AND: words.map((word) => ({
+            OR: [
+              { firstName: { contains: word, mode: 'insensitive' } },
+              { middleName: { contains: word, mode: 'insensitive' } },
+              { lastName: { contains: word, mode: 'insensitive' } },
+            ],
+          })),
+        });
+      }
     }
 
     const [items, total] = await this.prisma.$transaction([

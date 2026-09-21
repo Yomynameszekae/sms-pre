@@ -92,6 +92,113 @@ describe('StudentsService', () => {
         ]),
       );
     });
+
+    // ── full-name search ────────────────────────────────────────────────────
+    //
+    // A child's name spans three columns, so the query a parent or a teacher
+    // is most likely to type — the whole name — is the one no single
+    // `contains` can match.
+    describe('multi-word name search', () => {
+      /** The `where` handed to Prisma. */
+      const whereUsed = () => mockPrisma.student.findMany.mock.calls[0][0].where;
+
+      /** Does this `where` select the given child? Mirrors Prisma's semantics. */
+      function matches(where: any, st: Record<string, string | null>): boolean {
+        const clause = (c: any): boolean => {
+          if (c.OR) return c.OR.some(clause);
+          if (c.AND) return c.AND.every(clause);
+          for (const field of ['firstName', 'middleName', 'lastName', 'studentNumber', 'preferredName']) {
+            if (c[field]?.contains !== undefined) {
+              const value = st[field];
+              if (value == null) return false;
+              return value.toLowerCase().includes(String(c[field].contains).toLowerCase());
+            }
+          }
+          return true;
+        };
+        return where.OR ? where.OR.some(clause) : true;
+      }
+
+      const AMA = {
+        firstName: 'Ama', middleName: 'Serwaa', lastName: 'Boakye',
+        studentNumber: 'STU-0001', preferredName: 'Amy',
+      };
+      // Between them these two contain both words of "Ama Boakye", but
+      // neither person IS Ama Boakye.
+      const AMA_MENSAH = {
+        firstName: 'Ama', middleName: null, lastName: 'Mensah',
+        studentNumber: 'STU-0020', preferredName: null,
+      };
+      const KWABENA_BOAKYE = {
+        firstName: 'Kwabena', middleName: null, lastName: 'Boakye',
+        studentNumber: 'STU-0021', preferredName: null,
+      };
+
+      beforeEach(() => {
+        mockPrisma.student.findMany.mockResolvedValue([]);
+        mockPrisma.student.count.mockResolvedValue(0);
+        mockPrisma.$transaction.mockImplementation(async (arg: any) =>
+          typeof arg === 'function' ? arg(mockPrisma) : Promise.all(arg));
+      });
+
+      it('matches a full first + last name, which previously returned nothing', async () => {
+        await service.findAll('school-a', { search: 'Ama Boakye' } as any);
+        expect(matches(whereUsed(), AMA)).toBe(true);
+      });
+
+      it('does NOT cross-match two children who share half a name', async () => {
+        await service.findAll('school-a', { search: 'Ama Boakye' } as any);
+        const where = whereUsed();
+        expect(matches(where, AMA_MENSAH)).toBe(false);
+        expect(matches(where, KWABENA_BOAKYE)).toBe(false);
+      });
+
+      it('matches a name written with the middle name, as a register writes it', async () => {
+        await service.findAll('school-a', { search: 'Ama Serwaa Boakye' } as any);
+        const where = whereUsed();
+        expect(matches(where, AMA)).toBe(true);
+        // The other two have no middle name, so the Serwaa word matches nothing.
+        expect(matches(where, AMA_MENSAH)).toBe(false);
+        expect(matches(where, KWABENA_BOAKYE)).toBe(false);
+      });
+
+      it('matches a full name written the other way round', async () => {
+        await service.findAll('school-a', { search: 'Boakye Ama' } as any);
+        expect(matches(whereUsed(), AMA)).toBe(true);
+      });
+
+      it('is case-insensitive for a full name', async () => {
+        await service.findAll('school-a', { search: 'aMa SeRwAa bOaKyE' } as any);
+        expect(matches(whereUsed(), AMA)).toBe(true);
+      });
+
+      it('leaves preferredName out of search entirely', async () => {
+        // 'Amy' is this child's nickname. Searching it must not find her, and
+        // no clause anywhere may name the column.
+        await service.findAll('school-a', { search: 'Amy Boakye' } as any);
+        const where = whereUsed();
+        expect(JSON.stringify(where)).not.toContain('preferredName');
+        expect(matches(where, AMA)).toBe(false);
+      });
+
+      it('does not pair a name with another child\'s number', async () => {
+        await service.findAll('school-a', { search: 'Ama STU-0021' } as any);
+        expect(matches(whereUsed(), AMA)).toBe(false);
+      });
+
+      it('still matches a single name, as it always did', async () => {
+        await service.findAll('school-a', { search: 'Ama' } as any);
+        const where = whereUsed();
+        expect(matches(where, AMA)).toBe(true);
+        expect(matches(where, AMA_MENSAH)).toBe(true);
+        expect(matches(where, KWABENA_BOAKYE)).toBe(false);
+      });
+
+      it('applies no filter for a blank search', async () => {
+        await service.findAll('school-a', { search: '   ' } as any);
+        expect(whereUsed().OR).toBeUndefined();
+      });
+    });
   });
 
   describe('create', () => {
