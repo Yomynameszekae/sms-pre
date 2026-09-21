@@ -30,25 +30,34 @@ User → user_roles → roles → role_permissions → permissions → JWT claim
 
 **In your seeded local database, 10 of 11 staff have no login.** That's the expected shape of the data, not a bug — most staff simply aren't given system access.
 
-## How to provision a login for an existing staff member (current state, 2026-09-21)
+## How to provision a login for an existing staff member
 
-**There is no portal/UI path for this at all — not even for an unlinked account.** The backend supports it; the frontend has nothing:
+**There is a portal path for this now.** Staff screen (People → Staff) → the **key icon** in the Actions column on that person's row.
 
-- `POST /api/v1/users` (requires `users.create` permission) already accepts a request that creates a User pre-linked to an existing Staff row:
-  ```json
-  {
-    "email": "person@school.edu.gh",
-    "phone": "233...",
-    "password": "<min 8 chars, temporary>",
-    "linkedEntityType": "staff",
-    "linkedEntityId": "<the staff record's id>"
-  }
-  ```
-  This sets `mustChangePassword: true`, so the admin picks a temporary password and the person is forced to change it at first sign-in.
-- The **current workaround**: call this endpoint directly (curl/Postman) with an admin bearer token, then open **User Accounts** and tick a role for the new login — an account with zero roles can sign in but gets refused everywhere, which looks like a broken product rather than what it is.
-- **This is a known gap, not yet built**: a proper "Create login" action from the Staff screen. Estimated effort (not yet started):
-  - *Simple version* (admin sets a temporary password, same as the API today): roughly half a day — a UI dialog + wiring, no backend changes needed.
-  - *Proper version* (SMS-based invite, no human ever handles a password): 2–3 days — requires building the token-issuing side of the account_setup flow above, wiring the already-reserved `account_setup` notification trigger/template, and a public setup page on the frontend.
+The flow:
+
+1. The action is **disabled**, with the reason in its tooltip, for anyone who already has a login. Manage that account's roles on User Accounts instead.
+2. Clicking it opens a dialog pre-filled from the staff record — email and phone where the record holds them, both editable — plus a **generated temporary password**, with a button to generate another.
+3. On save it calls `POST /api/v1/users` with `linkedEntityType: "staff"` and the staff row's id, so the login is linked from the moment it exists.
+4. The password is temporary in the real sense: the backend sets `mustChangePassword`, so it survives exactly one sign-in. **Nothing is emailed or texted** — you hand it over directly.
+5. The dialog does **not** close on success. A brand-new account holds no roles and is refused on every screen it reaches, so the dialog turns into a role picker and warns until at least one role is ticked. The person must sign out and back in for roles to take effect.
+
+Backend note: `POST /users` now verifies the staff record exists before writing the link. `linked_entity_id` has no foreign key, so an unchecked id would have been stored as a dangling reference that nothing reported — the account would sign in fine and only misbehave on screens that resolve the staff member behind it. A bad id is now a 404 naming the problem.
+
+### Planned follow-up — replace the temporary password with an email invite
+
+This is a committed next step, not a hypothetical. The temporary-password handover works but means an admin handles a credential, which is exactly the step worth removing.
+
+The intended shape: instead of setting a password, the admin triggers an **emailed invite link** the staff member clicks to set their own. The foundation is already half-built — an `account_setup` token type exists and `POST /auth/account-setup/confirm` is fully implemented and will redeem one. What is missing is the issuing side, the send, and a public page to land on.
+
+Rough scope, **2–3 days**:
+
+- an endpoint that issues an `account_setup` token for a newly created user
+- delivery of the link — **note this needs an email-sending capability, which has to be checked/confirmed as part of that work.** The notification layer that exists today sends **SMS only**, and the direction here is email, so do not assume the existing gateway covers it. Establishing what email transport is available (or adding one) is part of the estimate, and the largest unknown in it.
+- wiring the already-reserved `account_setup` notification trigger and template
+- a public, unauthenticated page where the invite link lands and the password is set
+
+Until that ships, the temporary-password flow above is the supported route.
 
 ## Roles & Permissions — how grants work
 
