@@ -135,6 +135,26 @@ rule. See the comment block on `model Enrollment` in `schema.prisma`.
   still useful: the poller only ever claims rows whose status is `queued`, and
   a suppressed row is never `queued`.
 
+## Access control and operational runbooks
+
+Roles, permissions and the Staff/User split have their own guide:
+[`starter-docs/ROLES_AND_PERMISSIONS_ADMIN_GUIDE.md`](starter-docs/ROLES_AND_PERMISSIONS_ADMIN_GUIDE.md).
+
+Read it before diagnosing any "why can't this user do X" report. It covers the
+three things that are easy to confuse — a Staff record, the Staff `Role`
+category (which grants nothing), and an RBAC role — and carries the
+post-deploy step below.
+
+**`prisma migrate deploy` does not re-run seed data.** A phase that adds
+permissions leaves an already-migrated database without those rows until the
+sync is run, which surfaces as a 403 on a feature that works locally:
+
+```bash
+npm run permissions:check   # read-only: reports missing permissions and grants
+npm run permissions:sync    # inserts what is missing; never deletes
+npm run staff:login-check -- "<name | email | staff id>"   # read-only
+```
+
 ## Tests
 
 ```bash
